@@ -70,6 +70,14 @@ void* arraylist_get(arrlist_t * list, int idx) {
     return NULL;
 }
 
+const void* arraylist_const_get(const arrlist_t * list, int idx) {
+    if (idx < list->size) {
+        const void * result = list->data[idx];
+        return result;
+    }
+    return NULL;
+}
+
 void arraylist_set(arrlist_t * list, int idx, void * ptr) {
     if (idx < list->size) {
         list->data[idx] = ptr;

@@ -25,6 +25,8 @@ void arraylist_push(arrlist_t * list, void * ptr);
 void* arraylist_pop(arrlist_t * list);
 // get data at index
 void* arraylist_get(arrlist_t * list, int idx);
+//
+const void* arraylist_const_get(const arrlist_t * list, int idx);
 // set data at index
 void arraylist_set(arrlist_t * list, int idx, void * ptr);
 // remove elements from list matching condition of passed function
