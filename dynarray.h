@@ -34,6 +34,7 @@
         - O(n) partitioning
         - O(n) mapping and filtering
         - Unit tests
+        - realloc and free can be custom defined
 
     Table of contents:
         - Library instructionss
@@ -47,10 +48,22 @@
 #ifndef DYNARRAY_H
 #define DYNARRAY_H
 
+#include <stddef.h>
+#include <string.h>
+
 #define DYNARRAY_VERSION "0.1.2"
 #define DA_UNUSED(...) (void)(__VA_ARGS__)
 #define DA_MIN(a,b) ((a) < (b) ? (a) : (b))
 #define DA_MAX(a,b) ((a) > (b) ? (a) : (b))
+
+#if defined(DA_REALLOC) && !defined(DA_FREE) || !defined(DA_REALLOC) && defined(DA_FREE)
+#error "Both realloc and free must be defined, one is not sufficient."
+#endif
+#if !defined(DA_REALLOC) && !defined(DA_FREE)
+#include <stdlib.h>
+#define DA_REALLOC(c,pointer,size) realloc(pointer,size)
+#define DA_FREE(c,pointer) free(pointer)
+#endif
 
 typedef struct {
     size_t capacity;
@@ -96,6 +109,7 @@ extern void _da_unit_tests(void);
 #define arr_partition           da_arr_partition
 #define arr_partition_ctx       da_arr_partition_ctx
 #define arr_partition_ctx_range da_arr_partition_ctx_range
+#define arr_ptr                 da_arr_ptr
 
 #endif
 // // // // // // // // // // // // // // // 
@@ -170,6 +184,7 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #define da_arr_partition(Type,array,condition) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), NULL)
 #define da_arr_partition_ctx(Type,array,condition,ctx) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
 #define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _array_partition_range(sizeof(Type),array,start,end,(int(*)(const char *, void *))(condition), ctx)
+#define da_arr_ptr(Type,array) ((Type*)((array)->data))
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
@@ -178,18 +193,18 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #include <stdlib.h>
 #include <stddef.h>
 
-__attribute__((warn_unused_result,malloc))
+__attribute__((warn_unused_result))
 dynarray_t *_array_empty() {
-    dynarray_t *result = (dynarray_t *)malloc(sizeof(dynarray_t));
+    dynarray_t *result = (dynarray_t *)DA_REALLOC(NULL,NULL,sizeof(dynarray_t));
     
     memset(result, 0, sizeof(dynarray_t));
     return result;
 }
 
-__attribute__((warn_unused_result,malloc))
+__attribute__((warn_unused_result))
 dynarray_t *_array_init(size_t size, size_t init_capacity) {
     dynarray_t *ptr = _array_empty();
-    ptr->data = (char *)malloc(size*init_capacity);
+    ptr->data = (char *)DA_REALLOC(NULL,NULL,size*init_capacity);
     // memset(ptr->data, 0, size*init_capacity);
     ptr->capacity = init_capacity;
     return ptr;
@@ -204,10 +219,10 @@ void _array_set(size_t size, dynarray_t *arr, size_t idx, void *elem) {
     }
 }
 
-__attribute__((nonnull(3),malloc,warn_unused_result))
+__attribute__((nonnull(3),warn_unused_result))
 dynarray_t * _array_init_with(size_t size, size_t count, void * elem) {
     dynarray_t *ptr = _array_empty();
-    ptr->data = (char *)malloc(size*count);
+    ptr->data = (char *)DA_REALLOC(NULL,NULL,size*count);
     ptr->capacity = count;
     ptr->cnt = count;
     for (size_t i = 0; i < count; i++) {
@@ -220,12 +235,12 @@ __attribute__((nonnull(2)))
 static void _array_resize(size_t size, dynarray_t *arr, int direction, size_t init_capacity) {
     switch (direction) {
         case 1:
-            arr->data = (char *)realloc(arr->data, size*arr->capacity*2);
+            arr->data = (char *)DA_REALLOC(NULL, arr->data, size*arr->capacity*2);
             arr->capacity = arr->capacity*2;
             break;
         case 0:
             if (arr->capacity >= init_capacity * 2) {
-                arr->data = (char *)realloc(arr->data, size*(arr->capacity/2));
+                arr->data = (char *)DA_REALLOC(NULL, arr->data, size*(arr->capacity/2));
                 arr->capacity = arr->capacity/2;
             }
             break;
@@ -291,8 +306,8 @@ char *_array_get(size_t size, dynarray_t *arr, size_t idx) {
 
 __attribute__((nonnull(1)))
 void _array_free(dynarray_t *arr) {
-    free(arr->data);
-    free(arr);
+    DA_FREE(NULL,arr->data);
+    DA_FREE(NULL,arr);
 }
 
 __attribute__((nonnull(2,4)))
@@ -347,7 +362,7 @@ void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other) {
         dest->cnt = dest->cnt + other->cnt;
         _array_free(other);
     } else {
-        dest->data = (char *)realloc(dest->data, size*(dest->capacity + other->cnt));
+        dest->data = (char *)DA_REALLOC(NULL, dest->data, size*(dest->capacity + other->cnt));
         dest->capacity = dest->capacity + other->cnt;
         _array_concat(size, dest, other);
     }
@@ -471,6 +486,18 @@ void _da_unit_tests(void) {
     for (i = 0; i < 9; i++) {
         assert(*arr_get(int, array, i) == 5);
     }
+
+    arr_clear(array);
+    arr_push_value(int,array,10);
+    arr_push_value(int,array,5);
+
+    assert(arr_ptr(int,array)[0] == 10);
+
+    assert(arr_ptr(int,array)[1] == 5);
+    
+    arr_ptr(int,array)[1] = 11;
+
+    assert(arr_ptr(int,array)[1] == 11);
 
     arr_free(array);
     array = NULL;
