@@ -13,14 +13,14 @@
         #define DYNARRAY_NO_SHORT_NAMES
 
     Unit tests can be enabled by including the library as described above and 
-    defining DYNARRAY_UNIT_TESTS. The function _da_unit_tests() must then be called to run the tests.
+    defining DYNARRAY_UNIT_TESTS. The function _da_arr_unit_tests() must then be called to run the tests.
     Example:
         #define DYNARRAY_IMPLEMENTATION
         #define DYNARRAY_UNIT_TESTS
         #include "dynarray.h"
 
         int main() {
-            _da_unit_tests();
+            _da_arr_unit_tests();
             return 0;
         }
     
@@ -49,7 +49,6 @@
 #define DYNARRAY_H
 
 #include <stddef.h>
-#include <string.h>
 
 #define DYNARRAY_VERSION "0.1.2"
 #define DA_UNUSED(...) (void)(__VA_ARGS__)
@@ -74,7 +73,7 @@ typedef struct {
 #define DA_MIN_CAPACITY 100
 
 // // // // // // // // // // // // // // //
-extern void _da_unit_tests(void);
+extern void _da_arr_unit_tests(void);
 // // // // // // // // // // // // // // // 
 // Short names API
 #ifndef DYNARRAY_NO_SHORT_NAMES
@@ -420,7 +419,7 @@ static void _da_unit_test_map(int *item) {
     *item = (*item) * 2;
 }
 
-void _da_unit_tests(void) {
+void _da_arr_unit_tests(void) {
     dynarray_t *array = arr(int);
     int i, j;
     // assert length of array in two states
