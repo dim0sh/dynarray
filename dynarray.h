@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.1.2 - Iain Dorsch - 2026
+    version 0.2.0 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -50,7 +50,7 @@
 
 #include <stddef.h>
 
-#define DYNARRAY_VERSION "0.1.2"
+#define DYNARRAY_VERSION "0.2.0"
 #define DA_UNUSED(...) (void)(__VA_ARGS__)
 #define DA_MIN(a,b) ((a) < (b) ? (a) : (b))
 #define DA_MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -60,17 +60,22 @@
 #endif
 #if !defined(DA_REALLOC) && !defined(DA_FREE)
 #include <stdlib.h>
-#define DA_REALLOC(c,pointer,size) realloc(pointer,size)
-#define DA_FREE(c,pointer) free(pointer)
+#define DA_REALLOC(allocator,pointer,size) realloc(pointer,size)
+#define DA_FREE(allocator,pointer) free(pointer)
+#endif
+
+#ifndef DA_ARR_MIN_CAPACITY
+#define DA_ARR_MIN_CAPACITY 100
 #endif
 
 typedef struct {
     size_t capacity;
     size_t cnt;
+    void * allocator;
     char * data;
 } dynarray_t;
 
-#define DA_MIN_CAPACITY 100
+
 
 // // // // // // // // // // // // // // //
 extern void _da_arr_unit_tests(void);
@@ -78,11 +83,11 @@ extern void _da_arr_unit_tests(void);
 // Short names API
 #ifndef DYNARRAY_NO_SHORT_NAMES
 
-#define arr                     da_arr
 #define arr_reserve             da_arr_reserve
+#define arr                     da_arr
+#define arr_with                da_arr_with
 #define arr_set_value           da_arr_set_value
 #define arr_set                 da_arr_set
-#define arr_with                da_arr_with
 #define arr_foreach             da_arr_foreach
 #define arr_filter_each         da_arr_filter_each
 #define arr_map_each            da_arr_map_each
@@ -113,27 +118,48 @@ extern void _da_arr_unit_tests(void);
 #endif
 // // // // // // // // // // // // // // // 
 // Internal functions
-extern dynarray_t *_array_empty();
-extern dynarray_t *_array_init(size_t size, size_t init_capacity);
+extern dynarray_t *_array_empty(void * allocator);
+extern dynarray_t *_array_init(size_t size, size_t init_capacity, void * allocator);
 extern void _array_set(size_t size, dynarray_t *arr, size_t idx, void *elem);
-extern dynarray_t * _array_init_with(size_t size, size_t count, void * elem);
-extern void _array_push(size_t size, dynarray_t *arr, void *elem, size_t init_capacity);
-extern void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity);
-extern char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity);
+extern dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * allocator);
+extern void _array_push(size_t size, dynarray_t *arr, void *elem, size_t init_capacity, void * allocator);
+extern void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity, void * allocator);
+extern char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity, void * allocator);
 extern char *_array_get(size_t size, dynarray_t *arr, size_t idx);
-extern void _array_free(dynarray_t *arr);
-extern void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t init_capacity);
-extern void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity);
-extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other);
+extern void _array_free(dynarray_t *arr, void * allocator);
+extern void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t init_capacity, void * allocator);
+extern void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity, void * allocator);
+extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allocator);
 extern void _array_swap_item(size_t size, dynarray_t *array, size_t idx_one, size_t idx_two);
 extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
 // // // // // // // // // // // // // // // 
 // No short names API
-#define da_arr_reserve(Type, size) (dynarray_t *)_array_init(sizeof(Type), size)
-#define da_arr(Type) (dynarray_t *)_array_init(sizeof(Type), DA_MIN_CAPACITY)
+// // 
+// Allocation as parameter
+// // init operations
+// // // no allocator specified
+#define da_arr_reserve(Type, size) (dynarray_t *)_array_init(sizeof(Type), size,NULL)
+#define da_arr(Type) (dynarray_t *)_array_init(sizeof(Type), DA_ARR_MIN_CAPACITY,NULL)
+#define da_arr_with(Type, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem,NULL)
+// // // allocator specified
+#define da_arr_reserve_alloc(Type, Allocator, size) (dynarray_t *)_array_init(sizeof(Type), size, Allocator)
+#define da_arr_alloc(Type, Allocator) (dynarray_t *)_array_init(sizeof(Type), DA_ARR_MIN_CAPACITY, Allocator)
+#define da_arr_with_alloc(Type, Allocator, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem, Allocator)
+// // internal operation allocation
+#define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_push_front(Type,array,elem) da_arr_insert(Type,array,0,elem,(array)->allocator)
+#define da_arr_insert_value(Type,array,index,elem) _array_insert(sizeof(Type),array,index,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_insert(Type,array,index,elem) _array_insert(sizeof(Type),array,index,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_swap_remove(Type,array,index) _array_swap_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_remove(Type,array,index) _array_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
+#define da_arr_pop(Type,array) (Type *)_array_pop(sizeof(Type), array, DA_ARR_MIN_CAPACITY,(array)->allocator)
+// // non internal operation allocation
+#define da_arr_concat(Type,array_one,array_two) _array_concat(sizeof(Type),array_one,array_two,(array)->allocator)
+#define da_arr_free(array) _array_free(array,(array)->allocator)
+// No allocation as parameter
 #define da_arr_set_value(Type,array,index,elem) _array_set(sizeof(Type),array,index,(void *)&(Type){(elem)})
 #define da_arr_set(Type,array,index,elem) _array_set(sizeof(Type),array,index,elem)
-#define da_arr_with(Type, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem)
 #define da_arr_foreach(Type, item, array) for (Type *item = (Type *)array->data; item < (Type *)(array->data + array->cnt * sizeof(Type)); item++)
 #define da_arr_filter_each(Type, item, array, condition) \
     for (Type *item = (Type *)array->data; \
@@ -155,10 +181,6 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #define da_arr_capacity(array) (array)->capacity
 #define da_arr_is_empty(array) ((array)->cnt == 0)
 #define da_arr_clear(array) (array)->cnt = 0
-#define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_MIN_CAPACITY)
-#define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_MIN_CAPACITY)
-#define da_arr_free(array) _array_free(array)
-#define da_arr_swap_remove(Type,array,index) _array_swap_remove(sizeof(Type),array,index, DA_MIN_CAPACITY)
 #define da_arr_filter_remove_unstable(Type, array, condition) do{\
     size_t idx = 0;\
     while(idx < array->cnt) {\
@@ -171,14 +193,8 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
     }\
 }while(0)
 
-#define da_arr_pop(Type,array) (Type *)_array_pop(sizeof(Type), array, DA_MIN_CAPACITY)
 #define da_arr_get(Type,array,index) (Type *)_array_get(sizeof(Type),array,index)
 #define da_arr_peek(Type,array) da_arr_get(Type,array,array->cnt-1)
-#define da_arr_insert_value(Type,array,index,elem) _array_insert(sizeof(Type),array,index,(void *)&(Type){(elem)}, DA_MIN_CAPACITY)
-#define da_arr_insert(Type,array,index,elem) _array_insert(sizeof(Type),array,index,elem, DA_MIN_CAPACITY)
-#define da_arr_remove(Type,array,index) _array_remove(sizeof(Type),array,index, DA_MIN_CAPACITY)
-#define da_arr_push_front(Type,array,elem) da_arr_insert(Type,array,0,elem)
-#define da_arr_concat(Type,array_one,array_two) _array_concat(sizeof(Type),array_one,array_two)
 #define da_arr_swap(Type, array, idx_a, idx_b) _array_swap_item(sizeof(Type), array, idx_a, idx_b) 
 #define da_arr_partition(Type,array,condition) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), NULL)
 #define da_arr_partition_ctx(Type,array,condition,ctx) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
@@ -193,18 +209,19 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #include <stddef.h>
 
 __attribute__((warn_unused_result))
-dynarray_t *_array_empty() {
-    dynarray_t *result = (dynarray_t *)DA_REALLOC(NULL,NULL,sizeof(dynarray_t));
+dynarray_t *_array_empty(void * allocator) {
+    dynarray_t *result = (dynarray_t *)DA_REALLOC(allocator,NULL,sizeof(dynarray_t));
     
     memset(result, 0, sizeof(dynarray_t));
     return result;
 }
 
 __attribute__((warn_unused_result))
-dynarray_t *_array_init(size_t size, size_t init_capacity) {
-    dynarray_t *ptr = _array_empty();
-    ptr->data = (char *)DA_REALLOC(NULL,NULL,size*init_capacity);
+dynarray_t *_array_init(size_t size, size_t init_capacity, void * allocator) {
+    dynarray_t *ptr = _array_empty(allocator);
+    ptr->data = (char *)DA_REALLOC(allocator,NULL,size*init_capacity);
     // memset(ptr->data, 0, size*init_capacity);
+    ptr->allocator = allocator;
     ptr->capacity = init_capacity;
     return ptr;
 }
@@ -219,9 +236,10 @@ void _array_set(size_t size, dynarray_t *arr, size_t idx, void *elem) {
 }
 
 __attribute__((nonnull(3),warn_unused_result))
-dynarray_t * _array_init_with(size_t size, size_t count, void * elem) {
-    dynarray_t *ptr = _array_empty();
-    ptr->data = (char *)DA_REALLOC(NULL,NULL,size*count);
+dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * allocator) {
+    dynarray_t *ptr = _array_empty(allocator);
+    ptr->data = (char *)DA_REALLOC(allocator,NULL,size*count);
+    ptr->allocator = allocator;
     ptr->capacity = count;
     ptr->cnt = count;
     for (size_t i = 0; i < count; i++) {
@@ -231,15 +249,15 @@ dynarray_t * _array_init_with(size_t size, size_t count, void * elem) {
 }
 
 __attribute__((nonnull(2)))
-static void _array_resize(size_t size, dynarray_t *arr, int direction, size_t init_capacity) {
+static void _array_resize(size_t size, dynarray_t *arr, int direction, size_t init_capacity, void * allocator) {
     switch (direction) {
         case 1:
-            arr->data = (char *)DA_REALLOC(NULL, arr->data, size*arr->capacity*2);
+            arr->data = (char *)DA_REALLOC(allocator, arr->data, size*arr->capacity*2);
             arr->capacity = arr->capacity*2;
             break;
         case 0:
             if (arr->capacity >= init_capacity * 2) {
-                arr->data = (char *)DA_REALLOC(NULL, arr->data, size*(arr->capacity/2));
+                arr->data = (char *)DA_REALLOC(allocator, arr->data, size*(arr->capacity/2));
                 arr->capacity = arr->capacity/2;
             }
             break;
@@ -247,20 +265,20 @@ static void _array_resize(size_t size, dynarray_t *arr, int direction, size_t in
 }
 
 __attribute((hot,nonnull(2)))
-void _array_push(size_t size, dynarray_t *arr, void *elem, size_t init_capacity) {
+void _array_push(size_t size, dynarray_t *arr, void *elem, size_t init_capacity,void * allocator) {
     if (arr->cnt < arr->capacity) {
         char *ptr = arr->data;
         ptr = ptr + (size * arr->cnt);
         memcpy(ptr, elem, size);
         arr->cnt++;
     } else {
-        _array_resize(size, arr, 1, init_capacity);
-        _array_push(size, arr, elem, init_capacity);
+        _array_resize(size, arr, 1, init_capacity,allocator);
+        _array_push(size, arr, elem, init_capacity, allocator);
     }
 }
 
 __attribute__((nonnull(2)))
-void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity) {
+void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity, void * allocator) {
     if (arr->cnt > 0) {
         if (idx == arr->cnt-1) {
             arr->cnt--;
@@ -275,20 +293,20 @@ void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_ca
             arr->cnt--;
         }
         if (arr->cnt < arr->capacity/3) {
-            _array_resize(size, arr, 0, init_capacity);
+            _array_resize(size, arr, 0, init_capacity,allocator);
         }
     }
 
 }
 
 __attribute__((warn_unused_result,nonnull(2)))
-char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity) {
+char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity,void * allocator) {
     char *ptr = NULL;
     if (arr->cnt > 0) {
         ptr = arr->data + size * (arr->cnt - 1);
         arr->cnt--;
         if (arr->cnt < arr->capacity/3) {
-            _array_resize(size, arr, 0, init_capacity);
+            _array_resize(size, arr, 0, init_capacity,allocator);
         }
     }
     return ptr;
@@ -304,15 +322,15 @@ char *_array_get(size_t size, dynarray_t *arr, size_t idx) {
 }
 
 __attribute__((nonnull(1)))
-void _array_free(dynarray_t *arr) {
-    DA_FREE(NULL,arr->data);
-    DA_FREE(NULL,arr);
+void _array_free(dynarray_t *arr,void * allocator) {
+    DA_FREE(allocator,arr->data);
+    DA_FREE(allocator,arr);
 }
 
 __attribute__((nonnull(2,4)))
-void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t init_capacity) {
+void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t init_capacity,void * allocator) {
     if (idx == arr->cnt) {
-        _array_push(size, arr, elem, init_capacity);
+        _array_push(size, arr, elem, init_capacity, allocator);
         return;
     }
     if (idx < arr->cnt) {
@@ -324,14 +342,14 @@ void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t 
             memcpy(ptr_src, elem, size);
             arr->cnt++;
         } else {
-            _array_resize(size, arr, 1, init_capacity);
-            _array_insert(size, arr, idx, elem, init_capacity);
+            _array_resize(size, arr, 1, init_capacity,allocator);
+            _array_insert(size, arr, idx, elem, init_capacity,allocator);
         }
     }
 }
 
 __attribute((nonnull(2)))
-void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity) {
+void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity,void * allocator) {
     if (arr->cnt > 0) {
         if (idx == arr->cnt-1) {
             arr->cnt--;
@@ -345,13 +363,13 @@ void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacit
             arr->cnt--;
         }
         if (arr->cnt < arr->capacity/3) {
-            _array_resize(size, arr, 0, init_capacity);
+            _array_resize(size, arr, 0, init_capacity,allocator);
         }
     }
 }
 
 __attribute__((nonnull(2,3)))
-void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other) {
+void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allocator) {
     if (dest->capacity > dest->cnt + other->cnt) {
 
         char *ptr_dest = dest->data + size * dest->cnt;
@@ -359,11 +377,11 @@ void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other) {
         memcpy(ptr_dest, ptr_src, size * (other->cnt));
 
         dest->cnt = dest->cnt + other->cnt;
-        _array_free(other);
+        _array_free(other, allocator);
     } else {
-        dest->data = (char *)DA_REALLOC(NULL, dest->data, size*(dest->capacity + other->cnt));
+        dest->data = (char *)DA_REALLOC(allocator, dest->data, size*(dest->capacity + other->cnt));
         dest->capacity = dest->capacity + other->cnt;
-        _array_concat(size, dest, other);
+        _array_concat(size, dest, other, allocator);
     }
 }
 
