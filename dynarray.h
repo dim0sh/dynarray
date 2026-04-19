@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.2.0 - Iain Dorsch - 2026
+    version 0.2.1 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -21,6 +21,24 @@
 
         int main() {
             _da_arr_unit_tests();
+            return 0;
+        }
+
+    Custom allocation can be used by defining the custom allocator flag DA_ARR_CUSTOM_ALLOC and defining both realloc and free.
+    This also changes the behavior of the init functions of the array, 
+    which now will require a pointer to the allocator used as a parameter.
+    Example:
+        #define DYNARRAY_IMPLEMENTATION
+        #define DA_ARR_CUSTOM_ALLOC
+        #define DA_REALLOC(allocator,pointer,size) arena_realloc(allocator,pointer,size)
+        #define DA_FREE(allocator,pointer) arena_free(pointer)
+        #include "dynarray.h"
+
+        int main() {
+            // example allocator
+            arena_t * arena_buffer = arena_init(40000);
+            // changed array init requiring passing of allocator pointer
+            dynarray_t * list_one = da_arr(int,arena_buffer);
             return 0;
         }
     
@@ -50,13 +68,13 @@
 
 #include <stddef.h>
 
-#define DYNARRAY_VERSION "0.2.0"
+#define DYNARRAY_VERSION "0.2.1"
 #define DA_UNUSED(...) (void)(__VA_ARGS__)
 #define DA_MIN(a,b) ((a) < (b) ? (a) : (b))
 #define DA_MAX(a,b) ((a) > (b) ? (a) : (b))
 
 #if defined(DA_REALLOC) && !defined(DA_FREE) || !defined(DA_REALLOC) && defined(DA_FREE)
-#error "Both realloc and free must be defined, one is not sufficient."
+#error "The custom allocation flag (DA_ARR_CUSTOM_ALLOC) must be defined and both realloc and free must be defined, one is not sufficient."
 #endif
 #if !defined(DA_REALLOC) && !defined(DA_FREE)
 #include <stdlib.h>
@@ -86,6 +104,7 @@ extern void _da_arr_unit_tests(void);
 #define arr_reserve             da_arr_reserve
 #define arr                     da_arr
 #define arr_with                da_arr_with
+
 #define arr_set_value           da_arr_set_value
 #define arr_set                 da_arr_set
 #define arr_foreach             da_arr_foreach
@@ -137,14 +156,19 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 // // 
 // Allocation as parameter
 // // init operations
+#if defined(DA_ARR_CUSTOM_ALLOC)
+// // // allocator specified
+#define da_arr_reserve(Type, Allocator, size) (dynarray_t *)_array_init(sizeof(Type), size, Allocator)
+#define da_arr(Type, Allocator) (dynarray_t *)_array_init(sizeof(Type), DA_ARR_MIN_CAPACITY, Allocator)
+#define da_arr_with(Type, Allocator, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem, Allocator)
+
+#else
 // // // no allocator specified
 #define da_arr_reserve(Type, size) (dynarray_t *)_array_init(sizeof(Type), size,NULL)
 #define da_arr(Type) (dynarray_t *)_array_init(sizeof(Type), DA_ARR_MIN_CAPACITY,NULL)
 #define da_arr_with(Type, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem,NULL)
-// // // allocator specified
-#define da_arr_reserve_alloc(Type, Allocator, size) (dynarray_t *)_array_init(sizeof(Type), size, Allocator)
-#define da_arr_alloc(Type, Allocator) (dynarray_t *)_array_init(sizeof(Type), DA_ARR_MIN_CAPACITY, Allocator)
-#define da_arr_with_alloc(Type, Allocator, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem, Allocator)
+
+#endif
 // // internal operation allocation
 #define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
 #define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
