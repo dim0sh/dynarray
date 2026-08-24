@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.2.1 - Iain Dorsch - 2026
+    version 0.2.0 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -53,6 +53,7 @@
         - O(n) mapping and filtering
         - Unit tests
         - realloc and free can be custom defined
+        - rotate like c++ rotate
 
     Table of contents:
         - Library instructionss
@@ -86,13 +87,21 @@
 #define DA_ARR_MIN_CAPACITY 100
 #endif
 
+
+// #if defined(DA_ARR_CUSTOM_ALLOC)
 typedef struct {
     size_t capacity;
     size_t cnt;
     void * allocator;
     char * data;
 } dynarray_t;
-
+// #else
+// typedef struct {
+//     size_t capacity;
+//     size_t cnt;
+//     char * data;
+// } dynarray_t;
+// #endif
 
 
 // // // // // // // // // // // // // // //
@@ -440,6 +449,34 @@ size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size
         idx ++;
     }
     return tmp_true;
+}
+
+void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid, size_t last) {
+    if (first == mid) {
+        return;
+    }
+    if (first >= last) {
+        return;
+    }
+
+    size_t write = first; // 
+    size_t read = mid; //
+    size_t next_read = read; 
+    // One unnecessary if execution at beginning of loop executing three lines below should skip first execution of if.
+    // However, since the value is already the one which would be assigned in the first if could be irrelevant due to compiler optimization
+    //
+    // _array_swap_item(size, array, write, read);
+    // write++;
+    // read++;
+    while(read <= last) {
+        if (write == next_read) {
+            next_read = read;
+        }
+        _array_swap_item(size, array, write, read);
+        write++;
+        read++;
+    }
+    _array_rotate_swap(size, array, write, next_read, last);
 }
 
 #endif
