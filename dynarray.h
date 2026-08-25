@@ -61,8 +61,7 @@
         - realloc and free can be custom defined
         - print all elements with specified format.
             example for array of int: 
-                da_arr_print_all(int, list_one, printf(" %d;",*item));
-            
+                da_arr_print_all(int, list_one, " %d;",*item);
 
     Table of contents:
         - Library instructionss
@@ -126,8 +125,9 @@ extern void _da_arr_unit_tests(void);
 #define arr_set                 da_arr_set
 #define arr_foreach             da_arr_foreach
 #define arr_filter_each         da_arr_filter_each
-#define arr_map_each            da_arr_map_each
-#define arr_map_each_ctx        da_arr_map_each_ctx
+// #define arr_map_each            da_arr_map_each
+// #define arr_map_each_ctx        da_arr_map_each_ctx
+#define arr_map                 da_arr_map
 #define arr_len                 da_arr_len
 #define arr_capacity            da_arr_capacity
 #define arr_is_empty            da_arr_is_empty
@@ -168,6 +168,10 @@ extern void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_
 extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allocator);
 extern void _array_swap_item(size_t size, dynarray_t *array, size_t idx_one, size_t idx_two);
 extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
+extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid, size_t last);
+extern ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *));
+extern void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *));
+
 // // // // // // // // // // // // // // // 
 // No short names API
 // // 
@@ -202,12 +206,14 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #define da_arr_set_value(Type,array,index,elem) _array_set(sizeof(Type),array,index,(void *)&(Type){(elem)})
 #define da_arr_set(Type,array,index,elem) _array_set(sizeof(Type),array,index,elem)
 #define da_arr_foreach(Type, item, array) for (Type *item = (Type *)array->data; item < (Type *)(array->data + array->cnt * sizeof(Type)); item++)
+/**
 #define da_arr_filter_each(Type, item, array, condition) \
     for (Type *item = (Type *)array->data; \
          item < (Type *)(array->data + array->cnt * sizeof(Type)); \
          item++) \
             if (condition(item))\
-
+*/
+/**
 #define da_arr_map_each(Type, item, array, map) \
     for (Type *item = (Type *)array->data; \
          item < (Type *)(array->data + array->cnt * sizeof(Type)); \
@@ -217,11 +223,28 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
     for (Type *item = (Type *)array->data; \
          item < (Type *)(array->data + array->cnt * sizeof(Type)); \
          map(item, ctx), item++) \
+*/
+#define da_arr_map(Type, array, item, operation) do{\
+    for (Type *item = (Type *)array->data; \
+         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
+         item++) {\
+            {operation};\
+         }\
+}while(0)
+
+#define da_arr_filter_each(Type, array, item, condition, operation) do{\
+    da_arr_map(Type,array,item,{\
+        if(condition){\
+            {operation};\
+        }\
+    });\
+}while(0)
 
 #define da_arr_len(array) (array)->cnt
 #define da_arr_capacity(array) (array)->capacity
 #define da_arr_is_empty(array) ((array)->cnt == 0)
 #define da_arr_clear(array) (array)->cnt = 0
+/**
 #define da_arr_filter_remove_unstable(Type, array, condition) do{\
     size_t idx = 0;\
     while(idx < array->cnt) {\
@@ -230,6 +253,18 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
             da_arr_swap_remove(Type, array, idx);\
         } else {\
             idx++;\
+        }\
+    }\
+}while(0)
+*/
+#define da_arr_filter_remove_unstable(Type, array, item, condition) do{\
+    size_t traverse = 0;\
+    while(traverse < (array)->cnt) {\
+        Type *item = (Type *)((array)->data + traverse * sizeof(Type));\
+        if(condition) {\
+            da_arr_swap_remove(Type, array, traverse);\
+        }else{\
+            traverse++;\
         }\
     }\
 }while(0)
@@ -242,14 +277,43 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _array_partition_range(sizeof(Type),array,start,end,(int(*)(const char *, void *))(condition), ctx)
 #define da_arr_ptr(Type,array) ((Type*)((array)->data))
 
-#define da_arr_print_all(Type,array,output_format) do{\
-    for (Type *item = (Type *)array->data; \
-         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
-         item++) {\
-            output_format;\
-         }\
-         printf("\n");\
+#define da_arr_print_all(Type,array,item,...) do{\
+    da_arr_map(Type,array,item,{printf(__VA_ARGS__);});\
+    printf("\n");\
 }while(0)
+
+#define da_arr_match_first(Type, array, first, last, item, condition) ({\
+    ptrdiff_t __ret = -1;\
+    for(size_t __i = first; __i<(size_t)last; __i++) {\
+        Type* item = (Type *)((array)->data + __i * sizeof(Type));\
+        if(condition) {\
+            __ret = __i;\
+            break;\
+        }\
+    }\
+    __ret;\
+})
+/**
+#define da_arr_match_first(Type, array, first, last, item, condition, RESULT) do{\
+    RESULT = -1;\
+    for(size_t __i = first; __i<(size_t)last; __i++) {\
+        Type* item = (Type *)((array)->data + __i * sizeof(Type));\
+        if(condition) {\
+            RESULT = __i;\
+            break;\
+        }\
+    }\
+}while(0)
+*/
+#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) do{\
+    for (size_t i = 0; i < (size_t)last; i++) {\
+        Type * b = da_arr_get(Type, array, i);\
+        ptrdiff_t new_first = da_arr_match_first(Type, array, first, i, a, condition);\
+        if (new_first < 0) continue;\
+        _array_rotate_swap(sizeof(Type), array, new_first, i, i+1);\
+    }\
+}while(0)
+
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
@@ -496,20 +560,20 @@ void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid
     _array_rotate_swap(size, array, write, next_read, last);
 }
 
-ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *)) {
-    for (size_t i = first; i < last; i++) {
-        if (a_cmp_b(_array_get(size,array,i),value)) {
-            return i;
-        }
-    }
-    return -1;
-}
+// ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *)) {
+//     for (size_t i = first; i < last; i++) {
+//         if (a_cmp_b(_array_get(size,array,i),value)) {
+//             return i;
+//         }
+//     }
+//     return -1;
+// }
 
-void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *)) {
-    for (size_t i = 0; i < last; i++) {
-        _array_rotate_swap(size, array, _array_first_cond(size, array, first, i, _array_get(size, array, i), a_greater_b), i, i+1);
-    }
-}
+// void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *)) {
+//     for (size_t i = 0; i < last; i++) {
+//         _array_rotate_swap(size, array, _array_first_cond(size, array, first, i, _array_get(size, array, i), a_greater_b), i, i+1);
+//     }
+// }
 
 #endif
 // // // // // // // // // // // // // // // 
@@ -526,90 +590,102 @@ static int _da_unit_test_part_condition(const int *item, void *ctx) {
     return (*item % 2) == 0;
 }
 
-static void _da_unit_test_map(int *item) {
-    *item = (*item) * 2;
-}
-
 void _da_arr_unit_tests(void) {
-    dynarray_t *array = arr(int);
+    dynarray_t *array = da_arr(int);
     int i, j;
     // assert length of array in two states
-    assert(arr_len(array) == 0);
+    assert(da_arr_len(array) == 0);
     for (i = 0; i < 100; i++) {
-        arr_push_value(int, array, i);
+        da_arr_push_value(int, array, i);
     }
-    assert(arr_len(array) == 100);
+    assert(da_arr_len(array) == 100);
     // test foreach macro by checking the values of the retrieved items
-    arr_foreach(int, item, array) {
+    da_arr_foreach(int, item, array) {
         assert(*item == j);
         j++;
     }
     // assert if the values in the array are correct by get operation
     for (i = 0; i < 100; i++) {
-        assert(*arr_get(int, array, i) == i);
+        assert(*da_arr_get(int, array, i) == i);
     }
     // pop all items from array and assert their values are correct
     for (i = 0; i < 100; i++) {
-        assert(*arr_pop(int, array) == 99 - i);
+        assert(*da_arr_pop(int, array) == 99 - i);
     }
     // after popping all items the array should be emtpy
-    assert(arr_is_empty(array));
+    assert(da_arr_is_empty(array));
     // numbers 0-99 pushed to array
     for (int i = 0; i < 100; i++) {
-        arr_push_value(int, array, i);
+        da_arr_push_value(int, array, i);
     }
     // partition array with even numbers at the front and odd numbers at the back
-    size_t partition_index = arr_partition(int, array, _da_unit_test_part_condition);
+    size_t partition_index = da_arr_partition(int, array, _da_unit_test_part_condition);
     // assert if partition is successfull the start of the odd numbers must be at index 50
     assert(partition_index == 50);
 
     // assert correctness of values after mapping operation
-    arr_map_each(int, item, array, _da_unit_test_map);
+    da_arr_map(int, array, item, {*item = (*item) * 2;});
     for (i = 0; i < 50; i++) {
-        assert(*arr_get(int, array, i) == i*2*2);
+        assert(*da_arr_get(int, array, i) == i*2*2);
     }
 
     for (i = 50; i < 100; i++) {
-        arr_insert_value(int, array, i, 101);    
+        da_arr_insert_value(int, array, i, 101);    
     }
 
-    assert(arr_len(array) == 150);
+    assert(da_arr_len(array) == 150);
     for (i = 50; i < 100; i++) {
-        assert(*arr_get(int, array, i) == 101);
+        assert(*da_arr_get(int, array, i) == 101);
     }
 
-    arr_free(array);
+    da_arr_free(array);
 
     int tmp = 5;
-    array = arr_with(int, 10, &tmp);
+    array = da_arr_with(int, 10, &tmp);
     assert(arr_len(array) == 10);
-    arr_foreach(int, item, array) {
+    da_arr_foreach(int, item, array) {
         assert(*item == 5);
     }
 
-    arr_set_value(int, array, 3, 3);
-    assert(*arr_get(int, array, 3) == 3);
+    da_arr_set_value(int, array, 3, 3);
+    assert(*da_arr_get(int, array, 3) == 3);
 
-    arr_swap_remove(int, array, 3);
-    assert(arr_len(array) == 9);
+    da_arr_swap_remove(int, array, 3);
+    assert(da_arr_len(array) == 9);
     
     for (i = 0; i < 9; i++) {
-        assert(*arr_get(int, array, i) == 5);
+        assert(*da_arr_get(int, array, i) == 5);
     }
 
-    arr_clear(array);
-    arr_push_value(int,array,10);
-    arr_push_value(int,array,5);
+    da_arr_clear(array);
+    // check array_ptr access operation
+    da_arr_push_value(int,array,10);
+    da_arr_push_value(int,array,5);
 
-    assert(arr_ptr(int,array)[0] == 10);
+    assert(da_arr_ptr(int,array)[0] == 10);
 
-    assert(arr_ptr(int,array)[1] == 5);
+    assert(da_arr_ptr(int,array)[1] == 5);
     
-    arr_ptr(int,array)[1] = 11;
+    da_arr_ptr(int,array)[1] = 11;
 
-    assert(arr_ptr(int,array)[1] == 11);
+    assert(da_arr_ptr(int,array)[1] == 11);
+    // check insertion_sort 
+    // start config of array [10,11,2,5,3,4,9,7]
+    da_arr_push_value(int, array, 2);
+    da_arr_push_value(int, array, 5);
+    da_arr_push_value(int, array, 3);
+    da_arr_push_value(int, array, 4);
+    da_arr_push_value(int, array, 9);
+    da_arr_push_value(int, array, 7);
 
-    arr_free(array);
+    da_arr_insertion_sort(int, array, 0, da_arr_len(array), a, b, (*a>*b));
+    // end config should be [2,3,4,5,7,9,10,11]
+    int validation_array[8] = {2,3,4,5,7,9,10,11};
+    for (size_t i = 0; i < arr_len(array); i++) {
+        assert(validation_array[i] == *da_arr_get(int,array,i));
+    }
+
+    da_arr_free(array);
     array = NULL;
 }
 
