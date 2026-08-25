@@ -51,9 +51,18 @@
         - O(n + m) concatenation
         - O(n) partitioning
         - O(n) mapping and filtering
+        - O(n) rotate like c++ rotate
+        - O(n) find first item maching condition (first_cond)
+            can be made to be upper or lower bound by passing the according comparison function.
+        - insertion sort using rotate and upper_bound.
+            upper_bound is created by passing a a_greater_than_b function as the condition to first_cond.
+            thus a_greater_than_b must be provided to insertion sort.
         - Unit tests
         - realloc and free can be custom defined
-        - rotate like c++ rotate
+        - print all elements with specified format.
+            example for array of int: 
+                da_arr_print_all(int, list_one, printf(" %d;",*item));
+            
 
     Table of contents:
         - Library instructionss
@@ -102,7 +111,6 @@ typedef struct {
 //     char * data;
 // } dynarray_t;
 // #endif
-
 
 // // // // // // // // // // // // // // //
 extern void _da_arr_unit_tests(void);
@@ -233,6 +241,15 @@ extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t star
 #define da_arr_partition_ctx(Type,array,condition,ctx) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
 #define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _array_partition_range(sizeof(Type),array,start,end,(int(*)(const char *, void *))(condition), ctx)
 #define da_arr_ptr(Type,array) ((Type*)((array)->data))
+
+#define da_arr_print_all(Type,array,output_format) do{\
+    for (Type *item = (Type *)array->data; \
+         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
+         item++) {\
+            output_format;\
+         }\
+         printf("\n");\
+}while(0)
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
@@ -468,7 +485,7 @@ void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid
     // _array_swap_item(size, array, write, read);
     // write++;
     // read++;
-    while(read <= last) {
+    while(read < last) {
         if (write == next_read) {
             next_read = read;
         }
@@ -477,6 +494,21 @@ void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid
         read++;
     }
     _array_rotate_swap(size, array, write, next_read, last);
+}
+
+ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *)) {
+    for (size_t i = first; i < last; i++) {
+        if (a_cmp_b(_array_get(size,array,i),value)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *)) {
+    for (size_t i = 0; i < last; i++) {
+        _array_rotate_swap(size, array, _array_first_cond(size, array, first, i, _array_get(size, array, i), a_greater_b), i, i+1);
+    }
 }
 
 #endif
