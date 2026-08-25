@@ -169,8 +169,8 @@ extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void
 extern void _array_swap_item(size_t size, dynarray_t *array, size_t idx_one, size_t idx_two);
 extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
 extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid, size_t last);
-extern ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *));
-extern void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *));
+// extern ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *));
+// extern void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *));
 
 // // // // // // // // // // // // // // // 
 // No short names API
