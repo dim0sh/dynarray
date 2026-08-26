@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.2.0 - Iain Dorsch - 2026
+    version 0.3.0 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -77,7 +77,7 @@
 
 #include <stddef.h>
 
-#define DYNARRAY_VERSION "0.2.1"
+#define DYNARRAY_VERSION "0.3.0"
 #define DA_UNUSED(...) (void)(__VA_ARGS__)
 #define DA_MIN(a,b) ((a) < (b) ? (a) : (b))
 #define DA_MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -244,19 +244,7 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
 #define da_arr_capacity(array) (array)->capacity
 #define da_arr_is_empty(array) ((array)->cnt == 0)
 #define da_arr_clear(array) (array)->cnt = 0
-/**
-#define da_arr_filter_remove_unstable(Type, array, condition) do{\
-    size_t idx = 0;\
-    while(idx < array->cnt) {\
-        Type *item = (Type *)(array->data + idx * sizeof(Type));\
-        if(condition(item)) {\
-            da_arr_swap_remove(Type, array, idx);\
-        } else {\
-            idx++;\
-        }\
-    }\
-}while(0)
-*/
+
 #define da_arr_filter_remove_unstable(Type, array, item, condition) do{\
     size_t traverse = 0;\
     while(traverse < (array)->cnt) {\
@@ -282,6 +270,7 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
     printf("\n");\
 }while(0)
 
+/** GCC/clang braced group version
 #define da_arr_match_first(Type, array, first, last, item, condition) ({\
     ptrdiff_t __ret = -1;\
     for(size_t __i = first; __i<(size_t)last; __i++) {\
@@ -293,7 +282,8 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
     }\
     __ret;\
 })
-/**
+*/
+
 #define da_arr_match_first(Type, array, first, last, item, condition, RESULT) do{\
     RESULT = -1;\
     for(size_t __i = first; __i<(size_t)last; __i++) {\
@@ -304,7 +294,11 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
         }\
     }\
 }while(0)
-*/
+
+#define da_arr_wrapper_match_first(Type, array, first, last, item, condition, result_name) \
+    ptrdiff_t result_name;\
+    da_arr_match_first(Type, array, first, last, item, condition, result_name);\
+/** GCC/clang braced group compatible version
 #define da_arr_insertion_sort(Type, array, first, last, a, b, condition) do{\
     for (size_t i = 0; i < (size_t)last; i++) {\
         Type * b = da_arr_get(Type, array, i);\
@@ -313,7 +307,15 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
         _array_rotate_swap(sizeof(Type), array, new_first, i, i+1);\
     }\
 }while(0)
-
+*/
+#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) do{\
+    for (size_t i = 0; i < (size_t)last; i++) {\
+        Type * b = da_arr_get(Type, array, i);\
+        da_arr_wrapper_match_first(Type, array, first, i, a, condition, new_first);\
+        if (new_first < 0) continue;\
+        _array_rotate_swap(sizeof(Type), array, new_first, i, i+1);\
+    }\
+}while(0)
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
