@@ -242,7 +242,7 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
         }\
     });\
 }while(0)
-#define da_slice_match_first(Type, slice, first, last, item, condition, RESULT) do{\
+#define inner_slice_match_first(Type, slice, first, last, item, condition, RESULT) do{\
     RESULT = -1;\
     for(size_t __i = first; __i<(size_t)last; __i++) {\
         Type* item = (Type *)((slice)->start + __i * sizeof(Type));\
@@ -252,21 +252,23 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
         }\
     }\
 }while(0)
-#define da_slice_insertion_sort(Type, slice, first, last, a, b, condition) do{\
+#define da_slice_match_first(Type, slice, item, condition, RESULT) inner_slice_match_first(Type, slice, 0, (slice)->end, a, b, condition)
+#define inner_slice_insertion_sort(Type, slice, first, last, a, b, condition) do{\
     for (size_t i = 0; i < (size_t)last; i++) {\
         Type * b = da_slice_get(Type, (slice), i);\
         ptrdiff_t new_first;\
-        da_slice_match_first(Type, (slice), first, i, a, condition, new_first);\
+        inner_slice_match_first(Type, (slice), first, i, a, condition, new_first);\
         if (new_first < 0) continue;\
         _slice_rotate_swap(sizeof(Type), (slice), new_first, i, i+1);\
     }\
 }while(0)
+#define da_slice_insertion_sort(Type, slice, a, b, condition) inner_slice_insertion_sort(Type, slice, 0, (slice)->end, a, b, condition)
 #define da_slice_print_all(Type,slice,item,...) do{\
     da_slice_map(Type,slice,item,{printf(__VA_ARGS__);});\
     printf("\n");\
 }while(0)
-
 // // slice to array translation wrappers
+#define inner_arr_use_slice(array,slice_operation) do{slice_t *slice = &da_arr_to_slice(array); slice_operation;}while(0)
 #define da_arr_set_value(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,(void *)&(Type){(elem)})
 #define da_arr_set(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,elem)
 #define da_arr_get(Type,array,index) (Type *)_slice_get(sizeof(Type),&da_arr_to_slice(array),index)
@@ -276,11 +278,11 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
 #define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),start,end,(int(*)(const char *, void *))(condition), ctx)
 #define da_arr_rotate_swap(Type,array,first,mid,last) _slice_rotate_swap(sizeof(Type), &da_arr_to_slice(array), first, mid, last)
 #define da_arr_foreach(Type, item, array) da_slice_foreach(Type, item, &da_arr_to_slice(array))
-#define da_arr_map(Type, array, item, operation) da_slice_map(Type, &da_arr_to_slice(array), item, operation)
-#define da_arr_filter_each(Type, array, item, condition, operation) da_slice_filter_each(Type, &da_arr_to_slice(array), item, condition, operation)
-#define da_arr_match_first(Type, array, first, last, item, condition, RESULT) da_slice_match_first(Type, &da_arr_to_slice(array), first, last, item, condition, RESULT)
-#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) da_slice_insertion_sort(Type, &da_arr_to_slice(array), first, last, a, b, condition)
-#define da_arr_print_all(Type, array, item, ...) da_slice_print_all(Type, &da_arr_to_slice(array), item, __VA_ARGS__)
+#define da_arr_map(Type, array, item, operation) inner_arr_use_slice(array,da_slice_map(Type, slice, item, operation))
+#define da_arr_filter_each(Type, array, item, condition, operation) inner_arr_use_slice(array,da_slice_filter_each(Type, slice, item, condition, operation))
+#define da_arr_match_first(Type, array, first, last, item, condition, RESULT) inner_arr_use_slice(array,inner_slice_match_first(Type, slice, first, last, item, condition, RESULT))
+#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_insertion_sort(Type, slice, first, last, a, b, condition))
+#define da_arr_print_all(Type, array, item, ...) inner_arr_use_slice(array,da_slice_print_all(Type, slice, item, __VA_ARGS__))
 // // internal operation allocation
 #define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
 #define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
