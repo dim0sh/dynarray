@@ -29,3 +29,14 @@ Functionality provided by dynarray.h:
 - print all elements with specified format.
 ### arena.h
 Custom arena allocator compatible with dynarray.h
+
+Functionality provided by arena.h:
+
+- initialization of contigous memory buffer of a specified size
+- simple allocation, pushing to the end of the buffer
+- simple reallocation, keeping buffer or relying on simple allocation
+- dynamic allocation, use previously freed blocks to allocate to if possible (linear search through blocks)
+- dynamic reallocation, can keep buffer or rely on dynamic allocation.
+- free blocks in the arena
+- reset arena: declare arena as unused = new arena without new allocation
+- uninitialize arena
