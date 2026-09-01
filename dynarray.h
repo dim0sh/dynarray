@@ -63,6 +63,11 @@
             example for array of int: 
                 da_arr_print_all(int, list_one, " %d;",*item);
 
+    Non allocation functionality is implemented on a Slice meaning all that funcitonality
+    can be used with slices and functions to create slices from dynarrays is provided.
+    Slices also enable the use of these functionalities for other list types by providing
+    a pointer to the start of the list and the length of the list.
+
     Table of contents:
         - Library instructionss
         - short name API
@@ -95,6 +100,10 @@
 #define DA_ARR_MIN_CAPACITY 100
 #endif
 
+typedef struct {
+    size_t end;
+    char * start;
+} slice_t;
 
 // #if defined(DA_ARR_CUSTOM_ALLOC)
 typedef struct {
@@ -116,61 +125,77 @@ extern void _da_arr_unit_tests(void);
 // // // // // // // // // // // // // // // 
 // Short names API
 #ifndef DYNARRAY_NO_SHORT_NAMES
-
-#define arr_reserve             da_arr_reserve
-#define arr                     da_arr
-#define arr_with                da_arr_with
-
-#define arr_set_value           da_arr_set_value
-#define arr_set                 da_arr_set
-#define arr_foreach             da_arr_foreach
-#define arr_filter_each         da_arr_filter_each
-// #define arr_map_each            da_arr_map_each
-// #define arr_map_each_ctx        da_arr_map_each_ctx
-#define arr_map                 da_arr_map
-#define arr_len                 da_arr_len
-#define arr_capacity            da_arr_capacity
-#define arr_is_empty            da_arr_is_empty
-#define arr_clear               da_arr_clear
-#define arr_push_value          da_arr_push_value
-#define arr_push                da_arr_push
-#define arr_free                da_arr_free
-#define arr_swap_remove         da_arr_swap_remove
-#define arr_filter_remove_unstable da_arr_filter_remove_unstable
-#define arr_pop                 da_arr_pop
-#define arr_get                 da_arr_get
-#define arr_peek                da_arr_peek
-#define arr_insert_value        da_arr_insert_value
-#define arr_insert              da_arr_insert
-#define arr_remove              da_arr_remove
-#define arr_push_front          da_arr_push_front
-#define arr_concat              da_arr_concat
-#define arr_swap                da_arr_swap
-#define arr_partition           da_arr_partition
-#define arr_partition_ctx       da_arr_partition_ctx
-#define arr_partition_ctx_range da_arr_partition_ctx_range
-#define arr_ptr                 da_arr_ptr
+// arr macros init
+#define arr_reserve                 da_arr_reserve
+#define arr                         da_arr
+#define arr_with                    da_arr_with
+// arr macros functionality
+#define arr_set_value               da_arr_set_value
+#define arr_set                     da_arr_set
+#define arr_foreach                 da_arr_foreach
+#define arr_filter_each             da_arr_filter_each
+#define arr_map                     da_arr_map
+#define arr_len                     da_arr_len
+#define arr_capacity                da_arr_capacity
+#define arr_is_empty                da_arr_is_empty
+#define arr_clear                   da_arr_clear
+#define arr_push_value              da_arr_push_value
+#define arr_push                    da_arr_push
+#define arr_free                    da_arr_free
+#define arr_swap_remove             da_arr_swap_remove
+#define arr_filter_remove_unstable  da_arr_filter_remove_unstable
+#define arr_pop                     da_arr_pop
+#define arr_get                     da_arr_get
+#define arr_peek                    da_arr_peek
+#define arr_insert_value            da_arr_insert_value
+#define arr_insert                  da_arr_insert
+#define arr_remove                  da_arr_remove
+#define arr_push_front              da_arr_push_front
+#define arr_concat                  da_arr_concat
+#define arr_swap                    da_arr_swap
+#define arr_partition               da_arr_partition
+#define arr_partition_ctx           da_arr_partition_ctx
+#define arr_partition_ctx_range     da_arr_partition_ctx_range
+#define arr_ptr                     da_arr_ptr
+#define arr_match_first             da_arr_match_first
+#define arr_insertion_sort          da_arr_insertion_sort
+// slice macros
+#define slice_init                  da_slice_init
+#define slice_from_arr              da_slice_from_arr
+#define slice_from_arr_range        da_slice_from_arr_range
+#define slice_set                   da_slice_set
+#define slice_set_value             da_slice_set_value
+#define slice_get                   da_slice_get
+#define slice_foreach               da_slice_foreach
+#define slice_map                   da_slice_map
+#define slice_filter_each           da_slice_filter_each
+#define slice_swap                  da_slice_swap
+#define slice_rotate_swap           da_slice_rotate_swap
+#define slice_match_first           da_slice_match_first
+#define slice_insertion_sort        da_slice_insertion_sort
+#define slice_partition             da_slice_partition
+#define slice_partition_ctx         da_slice_partition_ctx
+#define slice_partition_ctx_range   da_slice_partition_ctx_range
 
 #endif
 // // // // // // // // // // // // // // // 
 // Internal functions
 extern dynarray_t *_array_empty(void * allocator);
 extern dynarray_t *_array_init(size_t size, size_t init_capacity, void * allocator);
-extern void _array_set(size_t size, dynarray_t *arr, size_t idx, void *elem);
 extern dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * allocator);
 extern void _array_push(size_t size, dynarray_t *arr, void *elem, size_t init_capacity, void * allocator);
 extern void _array_swap_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity, void * allocator);
 extern char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity, void * allocator);
-extern char *_array_get(size_t size, dynarray_t *arr, size_t idx);
 extern void _array_free(dynarray_t *arr, void * allocator);
 extern void _array_insert(size_t size, dynarray_t *arr, size_t idx, void *elem, size_t init_capacity, void * allocator);
 extern void _array_remove(size_t size, dynarray_t *arr, size_t idx, size_t init_capacity, void * allocator);
 extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allocator);
-extern void _array_swap_item(size_t size, dynarray_t *array, size_t idx_one, size_t idx_two);
-extern size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
-extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid, size_t last);
-// extern ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *));
-// extern void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *));
+// slice functions
+extern void _slice_set(size_t size, slice_t *slice, size_t idx, void *elem);
+extern char *_slice_get(size_t size, slice_t *slice, size_t idx);
+extern void _slice_swap_item(size_t size, slice_t *slice, size_t idx_one, size_t idx_two);
+extern void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, size_t last);
+extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
 
 // // // // // // // // // // // // // // // 
 // No short names API
@@ -190,6 +215,72 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
 #define da_arr_with(Type, count, elem) (dynarray_t *)_array_init_with(sizeof(Type), count, elem,NULL)
 
 #endif
+// // slice macros
+#define da_slice_init(start, end) _slice_init((char *)(start), end)
+#define da_slice_from_arr(array) _slice_from_array(array)
+#define da_slice_from_arr_range(Type, array, start, end) _slice_from_array_range(sizeof(Type),array,start,end)
+#define da_arr_to_slice(array) ((slice_t){.end = (array)->cnt, .start = (array)->data})
+#define da_slice_set_value(Type,slice,index,elem) _slice_set(sizeof(Type),slice,index,(void *)&(Type){(elem)})
+#define da_slice_set(Type,slice,index,elem) _slice_set(sizeof(Type),slice,index,elem)
+#define da_slice_get(Type,slice,index) (Type *)_slice_get(sizeof(Type),slice,index)
+#define da_slice_swap(Type, slice, idx_a, idx_b) _slice_swap_item(sizeof(Type), slice, idx_a, idx_b) 
+#define da_slice_partition(Type,slice,condition) _slice_partition_range(sizeof(Type),slice,0,(slice)->end,(int(*)(const char *, void *))(condition), NULL)
+#define da_slice_partition_ctx(Type,slice,condition,ctx) _slice_partition_range(sizeof(Type),slice,0,(slice)->end,(int(*)(const char *, void *))(condition), ctx)
+#define da_slice_partition_ctx_range(Type,slice,start,end,condition, ctx) _slice_partition_range(sizeof(Type),slice,start,end,(int(*)(const char *, void *))(condition), ctx)
+#define da_slice_foreach(Type, item, slice) for (Type *item = (Type *)(slice)->start; item < (Type *)((slice)->start + (slice)->end * sizeof(Type)); item++)
+#define da_slice_map(Type, slice, item, operation) do{\
+    for (Type *item = (Type *)(slice)->start; \
+         item < (Type *)((slice)->start + (slice)->end * sizeof(Type)); \
+         item++) {\
+            {operation};\
+         }\
+}while(0)
+#define da_slice_filter_each(Type, slice, item, condition, operation) do{\
+    da_slice_map(Type,slice,item,{\
+        if(condition){\
+            {operation};\
+        }\
+    });\
+}while(0)
+#define da_slice_match_first(Type, slice, first, last, item, condition, RESULT) do{\
+    RESULT = -1;\
+    for(size_t __i = first; __i<(size_t)last; __i++) {\
+        Type* item = (Type *)((slice)->start + __i * sizeof(Type));\
+        if(condition) {\
+            RESULT = __i;\
+            break;\
+        }\
+    }\
+}while(0)
+#define da_slice_insertion_sort(Type, slice, first, last, a, b, condition) do{\
+    for (size_t i = 0; i < (size_t)last; i++) {\
+        Type * b = da_slice_get(Type, (slice), i);\
+        ptrdiff_t new_first;\
+        da_slice_match_first(Type, (slice), first, i, a, condition, new_first);\
+        if (new_first < 0) continue;\
+        _slice_rotate_swap(sizeof(Type), (slice), new_first, i, i+1);\
+    }\
+}while(0)
+#define da_slice_print_all(Type,slice,item,...) do{\
+    da_slice_map(Type,slice,item,{printf(__VA_ARGS__);});\
+    printf("\n");\
+}while(0)
+
+// // slice to array translation wrappers
+#define da_arr_set_value(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,(void *)&(Type){(elem)})
+#define da_arr_set(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,elem)
+#define da_arr_get(Type,array,index) (Type *)_slice_get(sizeof(Type),&da_arr_to_slice(array),index)
+#define da_arr_swap(Type, array, idx_a, idx_b) _slice_swap_item(sizeof(Type), &da_arr_to_slice(array), idx_a, idx_b) 
+#define da_arr_partition(Type,array,condition) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),0,array->cnt,(int(*)(const char *, void *))(condition), NULL)
+#define da_arr_partition_ctx(Type,array,condition,ctx) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
+#define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),start,end,(int(*)(const char *, void *))(condition), ctx)
+#define da_arr_rotate_swap(Type,array,first,mid,last) _slice_rotate_swap(sizeof(Type), &da_arr_to_slice(array), first, mid, last)
+#define da_arr_foreach(Type, item, array) da_slice_foreach(Type, item, &da_arr_to_slice(array))
+#define da_arr_map(Type, array, item, operation) da_slice_map(Type, &da_arr_to_slice(array), item, operation)
+#define da_arr_filter_each(Type, array, item, condition, operation) da_slice_filter_each(Type, &da_arr_to_slice(array), item, condition, operation)
+#define da_arr_match_first(Type, array, first, last, item, condition, RESULT) da_slice_match_first(Type, &da_arr_to_slice(array), first, last, item, condition, RESULT)
+#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) da_slice_insertion_sort(Type, &da_arr_to_slice(array), first, last, a, b, condition)
+#define da_arr_print_all(Type, array, item, ...) da_slice_print_all(Type, &da_arr_to_slice(array), item, __VA_ARGS__)
 // // internal operation allocation
 #define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
 #define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
@@ -199,46 +290,9 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
 #define da_arr_swap_remove(Type,array,index) _array_swap_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
 #define da_arr_remove(Type,array,index) _array_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
 #define da_arr_pop(Type,array) (Type *)_array_pop(sizeof(Type), array, DA_ARR_MIN_CAPACITY,(array)->allocator)
-// // non internal operation allocation
 #define da_arr_concat(Type,array_one,array_two) _array_concat(sizeof(Type),array_one,array_two,(array)->allocator)
 #define da_arr_free(array) _array_free(array,(array)->allocator)
-// No allocation as parameter
-#define da_arr_set_value(Type,array,index,elem) _array_set(sizeof(Type),array,index,(void *)&(Type){(elem)})
-#define da_arr_set(Type,array,index,elem) _array_set(sizeof(Type),array,index,elem)
-#define da_arr_foreach(Type, item, array) for (Type *item = (Type *)array->data; item < (Type *)(array->data + array->cnt * sizeof(Type)); item++)
-/**
-#define da_arr_filter_each(Type, item, array, condition) \
-    for (Type *item = (Type *)array->data; \
-         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
-         item++) \
-            if (condition(item))\
-*/
-/**
-#define da_arr_map_each(Type, item, array, map) \
-    for (Type *item = (Type *)array->data; \
-         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
-         map(item), item++) \
-
-#define da_arr_map_each_ctx(Type, item, array, map, ctx) \
-    for (Type *item = (Type *)array->data; \
-         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
-         map(item, ctx), item++) \
-*/
-#define da_arr_map(Type, array, item, operation) do{\
-    for (Type *item = (Type *)array->data; \
-         item < (Type *)(array->data + array->cnt * sizeof(Type)); \
-         item++) {\
-            {operation};\
-         }\
-}while(0)
-
-#define da_arr_filter_each(Type, array, item, condition, operation) do{\
-    da_arr_map(Type,array,item,{\
-        if(condition){\
-            {operation};\
-        }\
-    });\
-}while(0)
+// // non internal operation allocation
 
 #define da_arr_len(array) (array)->cnt
 #define da_arr_capacity(array) (array)->capacity
@@ -257,65 +311,8 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
     }\
 }while(0)
 
-#define da_arr_get(Type,array,index) (Type *)_array_get(sizeof(Type),array,index)
-#define da_arr_peek(Type,array) da_arr_get(Type,array,array->cnt-1)
-#define da_arr_swap(Type, array, idx_a, idx_b) _array_swap_item(sizeof(Type), array, idx_a, idx_b) 
-#define da_arr_partition(Type,array,condition) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), NULL)
-#define da_arr_partition_ctx(Type,array,condition,ctx) _array_partition_range(sizeof(Type),array,0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
-#define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _array_partition_range(sizeof(Type),array,start,end,(int(*)(const char *, void *))(condition), ctx)
+#define da_arr_peek(Type,array) da_arr_get(Type,array,(array)->cnt-1)
 #define da_arr_ptr(Type,array) ((Type*)((array)->data))
-
-#define da_arr_print_all(Type,array,item,...) do{\
-    da_arr_map(Type,array,item,{printf(__VA_ARGS__);});\
-    printf("\n");\
-}while(0)
-
-/** GCC/clang braced group version
-#define da_arr_match_first(Type, array, first, last, item, condition) ({\
-    ptrdiff_t __ret = -1;\
-    for(size_t __i = first; __i<(size_t)last; __i++) {\
-        Type* item = (Type *)((array)->data + __i * sizeof(Type));\
-        if(condition) {\
-            __ret = __i;\
-            break;\
-        }\
-    }\
-    __ret;\
-})
-*/
-
-#define da_arr_match_first(Type, array, first, last, item, condition, RESULT) do{\
-    RESULT = -1;\
-    for(size_t __i = first; __i<(size_t)last; __i++) {\
-        Type* item = (Type *)((array)->data + __i * sizeof(Type));\
-        if(condition) {\
-            RESULT = __i;\
-            break;\
-        }\
-    }\
-}while(0)
-
-#define da_arr_wrapper_match_first(Type, array, first, last, item, condition, result_name) \
-    ptrdiff_t result_name;\
-    da_arr_match_first(Type, array, first, last, item, condition, result_name);\
-/** GCC/clang braced group compatible version
-#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) do{\
-    for (size_t i = 0; i < (size_t)last; i++) {\
-        Type * b = da_arr_get(Type, array, i);\
-        ptrdiff_t new_first = da_arr_match_first(Type, array, first, i, a, condition);\
-        if (new_first < 0) continue;\
-        _array_rotate_swap(sizeof(Type), array, new_first, i, i+1);\
-    }\
-}while(0)
-*/
-#define da_arr_insertion_sort(Type, array, first, last, a, b, condition) do{\
-    for (size_t i = 0; i < (size_t)last; i++) {\
-        Type * b = da_arr_get(Type, array, i);\
-        da_arr_wrapper_match_first(Type, array, first, i, a, condition, new_first);\
-        if (new_first < 0) continue;\
-        _array_rotate_swap(sizeof(Type), array, new_first, i, i+1);\
-    }\
-}while(0)
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
@@ -323,7 +320,96 @@ extern void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, siz
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
+// // // // // // // // // // // // // // // 
+// slice functions and array wrappers for them
+// slice functionality :
+// set; get; swap_item; rotate_swap; partition_range;
+slice_t _slice_init(char * start, size_t end) {
+    return (slice_t){.end = end, .start = start};
+}
 
+slice_t _slice_from_array(dynarray_t * array) {
+    return _slice_init(array->data,array->cnt);
+}
+
+slice_t _slice_from_array_range(size_t size, dynarray_t * array, size_t start, size_t end) {
+    if (start + end <= array->cnt) {
+        return _slice_init(array->data + size * start, end);
+    }
+    return _slice_init(array->data + size * start, array->cnt - start);
+}
+
+__attribute__((nonnull(2)))
+void _slice_set(size_t size, slice_t *slice, size_t idx, void *elem) {
+    if (idx < slice->end) {
+        char *ptr = slice->start;
+        ptr = ptr + (idx * size);
+        memcpy(ptr, elem, size);
+    }
+}
+
+__attribute__((hot,warn_unused_result,nonnull(2)))
+char *_slice_get(size_t size, slice_t *slice, size_t idx) {
+    char *ptr = NULL;
+    if (idx < slice->end) {
+        ptr = slice->start + (idx * size);
+    }
+    return ptr;
+}
+
+__attribute__((hot,nonnull(2)))
+void _slice_swap_item(size_t size, slice_t *slice, size_t idx_one, size_t idx_two) {
+    if (idx_one < slice->end && idx_two < slice->end && idx_one != idx_two) {
+        char * tmp_one = slice->start + size * idx_one;
+        char * tmp_two = slice->start + size * idx_two;
+        if (*tmp_one != *tmp_two) {
+            *tmp_one = *tmp_one ^ *tmp_two;
+            *tmp_two = *tmp_one ^ *tmp_two;
+            *tmp_one = *tmp_one ^ *tmp_two;
+        }
+    }
+}
+
+void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, size_t last) {
+    if (first == mid) {
+        return;
+    }
+    if (first >= last) {
+        return;
+    }
+
+    size_t write = first; // 
+    size_t read = mid; //
+    size_t next_read = read; 
+    // One unnecessary if execution at beginning of loop executing three lines below should skip first execution of if.
+    // However, since the value is already the one which would be assigned in the first if could be irrelevant due to compiler optimization
+    while(read < last) {
+        if (write == next_read) {
+            next_read = read;
+        }
+        _slice_swap_item(size, slice, write, read);
+        write++;
+        read++;
+    }
+    _slice_rotate_swap(size, slice, write, next_read, last);
+}
+
+__attribute__((hot,warn_unused_result,nonnull(2,5)))
+size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx) {
+    size_t tmp_true = start;
+    size_t idx = start;
+
+    for (char * elem = slice->start + (start * size); elem < (char *)(slice->start + DA_MIN(end * size,slice->end*size)); elem += size) {
+        if (f(elem, ctx)) {
+            _slice_swap_item(size, slice, idx, tmp_true);
+            tmp_true++;
+        }
+        idx ++;
+    }
+    return tmp_true;
+}
+// // // // // // // // // // // // // // // 
+// array functions: requires capacity and/or allocation
 __attribute__((warn_unused_result))
 dynarray_t *_array_empty(void * allocator) {
     dynarray_t *result = (dynarray_t *)DA_REALLOC(allocator,NULL,sizeof(dynarray_t));
@@ -342,15 +428,6 @@ dynarray_t *_array_init(size_t size, size_t init_capacity, void * allocator) {
     return ptr;
 }
 
-__attribute((nonnull(2)))
-void _array_set(size_t size, dynarray_t *arr, size_t idx, void *elem) {
-    if (idx < arr->cnt) {
-        char *ptr = arr->data;
-        ptr = ptr + (idx * size);
-        memcpy(ptr, elem, size);
-    }
-}
-
 __attribute__((nonnull(3),warn_unused_result))
 dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * allocator) {
     dynarray_t *ptr = _array_empty(allocator);
@@ -359,7 +436,7 @@ dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * all
     ptr->capacity = count;
     ptr->cnt = count;
     for (size_t i = 0; i < count; i++) {
-        _array_set(size,ptr,i,elem);
+        memcpy(ptr->data + size * i, elem, size);
     }
     return ptr;
 }
@@ -428,15 +505,6 @@ char *_array_pop(size_t size, dynarray_t *arr, size_t init_capacity,void * alloc
     return ptr;
 }
 
-__attribute__((hot,warn_unused_result,nonnull(2)))
-char *_array_get(size_t size, dynarray_t *arr, size_t idx) {
-    char *ptr = NULL;
-    if (idx < arr->cnt) {
-        ptr = arr->data + (idx * size);
-    }
-    return ptr;
-}
-
 __attribute__((nonnull(1)))
 void _array_free(dynarray_t *arr,void * allocator) {
     DA_FREE(allocator,arr->data);
@@ -500,82 +568,6 @@ void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allo
         _array_concat(size, dest, other, allocator);
     }
 }
-
-__attribute__((hot,nonnull(2)))
-void _array_swap_item(size_t size, dynarray_t *array, size_t idx_one, size_t idx_two) {
-    if (idx_one < array->cnt && idx_two < array->cnt && idx_one != idx_two) {
-        char * tmp_one = array->data + size * idx_one;
-        char * tmp_two = array->data + size * idx_two;
-        if (*tmp_one != *tmp_two) {
-            *tmp_one = *tmp_one ^ *tmp_two;
-            *tmp_two = *tmp_one ^ *tmp_two;
-            *tmp_one = *tmp_one ^ *tmp_two;
-            // char * tmp = (char *)malloc(size);
-            // memcpy(tmp, tmp_one, size);
-            // memcpy(tmp_one, tmp_two, size);
-            // memcpy(tmp_two, tmp, size);
-            // free(tmp);
-        }
-    }
-}  
-
-__attribute__((hot,warn_unused_result,nonnull(2,5)))
-size_t _array_partition_range(size_t size, dynarray_t *array, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx) {
-    size_t tmp_true = start;
-    size_t idx = start;
-
-    for (char * elem = array->data + (start * size); elem < (char *)(array->data + DA_MIN(end * size,array->cnt*size)); elem += size) {
-        if (f(elem, ctx)) {
-            _array_swap_item(size, array, idx, tmp_true);
-            tmp_true++;
-        }
-        idx ++;
-    }
-    return tmp_true;
-}
-
-void _array_rotate_swap(size_t size, dynarray_t *array, size_t first, size_t mid, size_t last) {
-    if (first == mid) {
-        return;
-    }
-    if (first >= last) {
-        return;
-    }
-
-    size_t write = first; // 
-    size_t read = mid; //
-    size_t next_read = read; 
-    // One unnecessary if execution at beginning of loop executing three lines below should skip first execution of if.
-    // However, since the value is already the one which would be assigned in the first if could be irrelevant due to compiler optimization
-    //
-    // _array_swap_item(size, array, write, read);
-    // write++;
-    // read++;
-    while(read < last) {
-        if (write == next_read) {
-            next_read = read;
-        }
-        _array_swap_item(size, array, write, read);
-        write++;
-        read++;
-    }
-    _array_rotate_swap(size, array, write, next_read, last);
-}
-
-// ptrdiff_t _array_first_cond(size_t size, dynarray_t *array, size_t first, size_t last, char * value, int (*a_cmp_b)(const char *, const char *)) {
-//     for (size_t i = first; i < last; i++) {
-//         if (a_cmp_b(_array_get(size,array,i),value)) {
-//             return i;
-//         }
-//     }
-//     return -1;
-// }
-
-// void _array_insertion_sort(size_t size, dynarray_t *array, size_t first, size_t last, int (*a_greater_b)(const char *, const char *)) {
-//     for (size_t i = 0; i < last; i++) {
-//         _array_rotate_swap(size, array, _array_first_cond(size, array, first, i, _array_get(size, array, i), a_greater_b), i, i+1);
-//     }
-// }
 
 #endif
 // // // // // // // // // // // // // // // 
@@ -680,12 +672,15 @@ void _da_arr_unit_tests(void) {
     da_arr_push_value(int, array, 9);
     da_arr_push_value(int, array, 7);
 
-    da_arr_insertion_sort(int, array, 0, da_arr_len(array), a, b, (*a>*b));
+    da_arr_insertion_sort(int, array, 0, array->cnt, a, b, (*a>*b));
     // end config should be [2,3,4,5,7,9,10,11]
     int validation_array[8] = {2,3,4,5,7,9,10,11};
     for (size_t i = 0; i < arr_len(array); i++) {
         assert(validation_array[i] == *da_arr_get(int,array,i));
     }
+
+    da_arr_set_value(int, array, 0, 15);
+    assert(*da_arr_get(int, array, 0) == 15);
 
     da_arr_free(array);
     array = NULL;
