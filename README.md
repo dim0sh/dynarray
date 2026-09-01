@@ -1,4 +1,4 @@
-# A C standard lib project
+# stc_lib - A C standard lib project
 providing general data-structures and functionality
 ## Features
 ### dynarray.h
@@ -27,3 +27,5 @@ Functionality provided by dynarray.h:
 - Unit tests
 - realloc and free can be custom defined
 - print all elements with specified format.
+### arena.h
+Custom arena allocator compatible with dynarray.h
