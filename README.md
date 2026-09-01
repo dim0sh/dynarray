@@ -3,8 +3,11 @@ providing general data-structures and functionality
 ## Features
 ### dynarray.h
 General dynamic array 
+
 General slices
+
 Functionality provided by dynarray.h:
+
         - Dynamic array of any type
         - Slice of any type
         - Amortized O(1) push and pop operations
