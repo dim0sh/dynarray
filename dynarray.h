@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.3.0 - Iain Dorsch - 2026
+    version 0.3.2 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -97,13 +97,18 @@
 #endif
 
 #ifndef DA_ARR_MIN_CAPACITY
-#define DA_ARR_MIN_CAPACITY 100
+#define DA_ARR_MIN_CAPACITY 1000
 #endif
 
 typedef struct {
     size_t end;
     char * start;
 } slice_t;
+
+typedef struct {
+    size_t start;
+    size_t end;
+} range_t;
 
 // #if defined(DA_ARR_CUSTOM_ALLOC)
 typedef struct {
@@ -152,10 +157,8 @@ extern void _da_arr_unit_tests(void);
 #define arr_remove                  da_arr_remove
 #define arr_push_front              da_arr_push_front
 #define arr_concat                  da_arr_concat
-#define arr_swap                    da_arr_swap
+#define arr_swap_index              da_arr_swap_index
 #define arr_partition               da_arr_partition
-#define arr_partition_ctx           da_arr_partition_ctx
-#define arr_partition_ctx_range     da_arr_partition_ctx_range
 #define arr_ptr                     da_arr_ptr
 #define arr_match_first             da_arr_match_first
 #define arr_insertion_sort          da_arr_insertion_sort
@@ -174,8 +177,6 @@ extern void _da_arr_unit_tests(void);
 #define slice_match_first           da_slice_match_first
 #define slice_insertion_sort        da_slice_insertion_sort
 #define slice_partition             da_slice_partition
-#define slice_partition_ctx         da_slice_partition_ctx
-#define slice_partition_ctx_range   da_slice_partition_ctx_range
 
 #endif
 // // // // // // // // // // // // // // // 
@@ -193,9 +194,10 @@ extern void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void
 // slice functions
 extern void _slice_set(size_t size, slice_t *slice, size_t idx, void *elem);
 extern char *_slice_get(size_t size, slice_t *slice, size_t idx);
-extern void _slice_swap_item(size_t size, slice_t *slice, size_t idx_one, size_t idx_two);
+extern void _slice_swap_index(size_t size, slice_t *slice, size_t idx_one, size_t idx_two);
 extern void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, size_t last);
-extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx);
+extern ptrdiff_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *));
+extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *));
 
 // // // // // // // // // // // // // // // 
 // No short names API
@@ -223,10 +225,9 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
 #define da_slice_set_value(Type,slice,index,elem) _slice_set(sizeof(Type),slice,index,(void *)&(Type){(elem)})
 #define da_slice_set(Type,slice,index,elem) _slice_set(sizeof(Type),slice,index,elem)
 #define da_slice_get(Type,slice,index) (Type *)_slice_get(sizeof(Type),slice,index)
-#define da_slice_swap(Type, slice, idx_a, idx_b) _slice_swap_item(sizeof(Type), slice, idx_a, idx_b) 
-#define da_slice_partition(Type,slice,condition) _slice_partition_range(sizeof(Type),slice,0,(slice)->end,(int(*)(const char *, void *))(condition), NULL)
-#define da_slice_partition_ctx(Type,slice,condition,ctx) _slice_partition_range(sizeof(Type),slice,0,(slice)->end,(int(*)(const char *, void *))(condition), ctx)
-#define da_slice_partition_ctx_range(Type,slice,start,end,condition, ctx) _slice_partition_range(sizeof(Type),slice,start,end,(int(*)(const char *, void *))(condition), ctx)
+// #define da_slice_swap(Type, slice, idx_a, idx_b) _slice_swap_index(sizeof(Type), slice, idx_a, idx_b) 
+#define da_slice_swap_index(Type, slice, idx_a, idx_b) _slice_swap_index(sizeof(Type), slice, idx_a, idx_b) 
+// #define da_slice_partition(Type,slice,condition) _slice_partition_range(sizeof(Type),slice,0,(slice)->end,(int(*)(const char *, const char *))(condition))
 #define da_slice_foreach(Type, item, slice) for (Type *item = (Type *)(slice)->start; item < (Type *)((slice)->start + (slice)->end * sizeof(Type)); item++)
 #define da_slice_map(Type, slice, item, operation) do{\
     for (Type *item = (Type *)(slice)->start; \
@@ -245,7 +246,8 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
 #define inner_slice_match_first(Type, slice, first, last, item, condition, RESULT) do{\
     RESULT = -1;\
     for(size_t __i = first; __i<(size_t)last; __i++) {\
-        Type* item = (Type *)((slice)->start + __i * sizeof(Type));\
+        /**Type* item = (Type *)((slice)->start + __i * sizeof(Type));*/\
+        Type* item = da_slice_get(Type,slice,__i);\
         if(condition) {\
             RESULT = __i;\
             break;\
@@ -254,15 +256,63 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
 }while(0)
 #define da_slice_match_first(Type, slice, item, condition, RESULT) inner_slice_match_first(Type, slice, 0, (slice)->end, a, b, condition)
 #define inner_slice_insertion_sort(Type, slice, first, last, a, b, condition) do{\
+    Type * b;\
+    ptrdiff_t new_first;\
     for (size_t i = 0; i < (size_t)last; i++) {\
-        Type * b = da_slice_get(Type, (slice), i);\
-        ptrdiff_t new_first;\
-        inner_slice_match_first(Type, (slice), first, i, a, condition, new_first);\
+        b = da_slice_get(Type, slice, i);\
+        inner_slice_match_first(Type, slice, first, i, a, condition, new_first);\
         if (new_first < 0) continue;\
-        _slice_rotate_swap(sizeof(Type), (slice), new_first, i, i+1);\
+        _slice_rotate_swap(sizeof(Type), slice, new_first, i, i+1);\
     }\
 }while(0)
 #define da_slice_insertion_sort(Type, slice, a, b, condition) inner_slice_insertion_sort(Type, slice, 0, (slice)->end, a, b, condition)
+#define inner_slice_partition_range(Type, slice, start, end, a, b, condition, RESULT) do{\
+    Type *a;\
+    Type *b;\
+    RESULT = -1;\
+    if (end > 0) {\
+        size_t inner_end = end - 1;\
+        if (inner_end <= start) return -1;\
+        Type * elem_pivot = (Type *)_slice_get(sizeof(Type),slice,inner_end);\
+        ptrdiff_t i = start;\
+        for (size_t j = start; j < inner_end; j++) {\
+            Type * elem_j = (Type *)_slice_get(sizeof(Type),slice,j);\
+            a=elem_j;\
+            b=elem_pivot;\
+            if (condition) {\
+                _slice_swap_index(sizeof(Type),slice,i,j);\
+                i++;\
+            }\
+        }\
+        _slice_swap_index(sizeof(Type),slice,i,inner_end);\
+        RESULT = i;\
+    }\
+}while(0)
+#define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
+    dynarray_t * stack = _array_init(sizeof(range_t), DA_ARR_MIN_CAPACITY, NULL);\
+    ptrdiff_t pi;\
+    int done = 1;\
+    range_t *c_range = &((range_t){.start = first, .end = last});\
+    while (done) {\
+        if (c_range->start < c_range->end-1) {\
+            inner_slice_partition_range(Type,(slice),c_range->start,c_range->end,a,b,condition,pi);\
+            if (pi > (ptrdiff_t)c_range->start) {\
+                _array_push(sizeof(range_t), stack, &((range_t){.start=c_range->start, .end=pi}), DA_ARR_MIN_CAPACITY, NULL);\
+            }\
+            if (pi < (ptrdiff_t)c_range->end-1) {\
+                _array_push(sizeof(range_t), stack, &((range_t){.start=pi + 1, .end=c_range->end}), DA_ARR_MIN_CAPACITY, NULL);\
+            }\
+        }\
+        if (stack->cnt > 0) {\
+            c_range = (range_t *)_array_pop(sizeof(range_t), stack, DA_ARR_MIN_CAPACITY, NULL);\
+        } else {\
+            done = 0;\
+        }\
+    }\
+    _array_free(stack,NULL);\
+    inner_slice_insertion_sort(Type,slice,first,last,a,b,(*a>*b)); \
+}while(0)
+#define da_slice_quick_sort(Type, slice, a, b, condition) inner_slice_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
 #define da_slice_print_all(Type,slice,item,...) do{\
     da_slice_map(Type,slice,item,{printf(__VA_ARGS__);});\
     printf("\n");\
@@ -272,16 +322,15 @@ extern size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, 
 #define da_arr_set_value(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,(void *)&(Type){(elem)})
 #define da_arr_set(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,elem)
 #define da_arr_get(Type,array,index) (Type *)_slice_get(sizeof(Type),&da_arr_to_slice(array),index)
-#define da_arr_swap(Type, array, idx_a, idx_b) _slice_swap_item(sizeof(Type), &da_arr_to_slice(array), idx_a, idx_b) 
-#define da_arr_partition(Type,array,condition) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),0,array->cnt,(int(*)(const char *, void *))(condition), NULL)
-#define da_arr_partition_ctx(Type,array,condition,ctx) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),0,array->cnt,(int(*)(const char *, void *))(condition), ctx)
-#define da_arr_partition_ctx_range(Type,array,start,end,condition, ctx) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),start,end,(int(*)(const char *, void *))(condition), ctx)
+#define da_arr_swap_index(Type, array, idx_a, idx_b) _slice_swap_index(sizeof(Type), &da_arr_to_slice(array), idx_a, idx_b) 
+#define da_arr_partition(Type,array,condition) _slice_partition_range(sizeof(Type),&da_arr_to_slice(array),0,array->cnt,(int(*)(const char *,const char *))(condition))
 #define da_arr_rotate_swap(Type,array,first,mid,last) _slice_rotate_swap(sizeof(Type), &da_arr_to_slice(array), first, mid, last)
 #define da_arr_foreach(Type, item, array) da_slice_foreach(Type, item, &da_arr_to_slice(array))
 #define da_arr_map(Type, array, item, operation) inner_arr_use_slice(array,da_slice_map(Type, slice, item, operation))
 #define da_arr_filter_each(Type, array, item, condition, operation) inner_arr_use_slice(array,da_slice_filter_each(Type, slice, item, condition, operation))
 #define da_arr_match_first(Type, array, first, last, item, condition, RESULT) inner_arr_use_slice(array,inner_slice_match_first(Type, slice, first, last, item, condition, RESULT))
 #define da_arr_insertion_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_insertion_sort(Type, slice, first, last, a, b, condition))
+#define da_arr_quick_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition))
 #define da_arr_print_all(Type, array, item, ...) inner_arr_use_slice(array,da_slice_print_all(Type, slice, item, __VA_ARGS__))
 // // internal operation allocation
 #define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
@@ -360,15 +409,14 @@ char *_slice_get(size_t size, slice_t *slice, size_t idx) {
 }
 
 __attribute__((hot,nonnull(2)))
-void _slice_swap_item(size_t size, slice_t *slice, size_t idx_one, size_t idx_two) {
+void _slice_swap_index(size_t size, slice_t *slice, size_t idx_one, size_t idx_two) {
     if (idx_one < slice->end && idx_two < slice->end && idx_one != idx_two) {
-        char * tmp_one = slice->start + size * idx_one;
-        char * tmp_two = slice->start + size * idx_two;
-        if (*tmp_one != *tmp_two) {
-            *tmp_one = *tmp_one ^ *tmp_two;
-            *tmp_two = *tmp_one ^ *tmp_two;
-            *tmp_one = *tmp_one ^ *tmp_two;
-        }
+        char *a = _slice_get(size, slice, idx_one);
+        char *b = _slice_get(size, slice, idx_two);
+        unsigned char tmp[size];
+        memcpy(tmp, a, size);
+        memcpy(a, b, size);
+        memcpy(b, tmp, size);
     }
 }
 
@@ -389,7 +437,7 @@ void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, s
         if (write == next_read) {
             next_read = read;
         }
-        _slice_swap_item(size, slice, write, read);
+        _slice_swap_index(size, slice, write, read);
         write++;
         read++;
     }
@@ -397,19 +445,61 @@ void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, s
 }
 
 __attribute__((hot,warn_unused_result,nonnull(2,5)))
-size_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, void *ctx), void *ctx) {
-    size_t tmp_true = start;
-    size_t idx = start;
-
-    for (char * elem = slice->start + (start * size); elem < (char *)(slice->start + DA_MIN(end * size,slice->end*size)); elem += size) {
-        if (f(elem, ctx)) {
-            _slice_swap_item(size, slice, idx, tmp_true);
-            tmp_true++;
-        }
-        idx ++;
+ptrdiff_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
+    if (end <= 0) {
+        return -1;
     }
-    return tmp_true;
+    size_t inner_end = end - 1;
+    if (inner_end <= start) return -1;
+    // size_t pivot_idx = inner_end;
+    char * elem_pivot = _slice_get(size,slice,inner_end);
+    ptrdiff_t i = start;
+    for (size_t j = start; j < inner_end; j++) {
+        char * elem_j = _slice_get(size,slice,j);
+        if (f(elem_j,elem_pivot)) {
+            _slice_swap_index(size,slice,i,j);
+            i++;
+        }
+    }
+    _slice_swap_index(size,slice,i,inner_end);
+    return i;
 }
+
+void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
+    if (start < end-1) {
+        ptrdiff_t pi = _slice_partition_range(size,slice,start,end,f);
+        if (pi > start) {
+            _slice_quick_sort(size, slice, start, pi, f);
+        }
+        if (pi < end-1) {
+            _slice_quick_sort(size, slice, pi + 1, end, f);
+        }
+    }
+}
+
+// void _slice_non_recursive_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
+//     dynarray_t * stack = _array_init(sizeof(range_t), DA_ARR_MIN_CAPACITY, NULL);
+//     ptrdiff_t pi;
+//     int done = 1;
+//     range_t *c_range = &(range_t){.start = start, .end = end};
+//     while (done) {
+//         if (c_range->start < c_range->end-1) {
+//             pi = _slice_partition_range(size,slice,c_range->start,c_range->end,f);
+//             if (pi > c_range->start) {
+//                 _array_push(sizeof(range_t), stack, &(range_t){.start=c_range->start, .end=pi}, DA_ARR_MIN_CAPACITY, NULL);
+//             }
+//             if (pi < c_range->end-1) {
+//                 _array_push(sizeof(range_t), stack, &(range_t){.start=pi + 1, .end=c_range->end}, DA_ARR_MIN_CAPACITY, NULL);
+//             }
+//         }
+//         if (stack->cnt > 0) {
+//             c_range = _array_pop(sizeof(range_t), stack, DA_ARR_MIN_CAPACITY, NULL);
+//         } else {
+//             done = 0;
+//         }
+//     }
+//     _array_free(stack,NULL);
+// }
 // // // // // // // // // // // // // // // 
 // array functions: requires capacity and/or allocation
 __attribute__((warn_unused_result))
@@ -581,9 +671,9 @@ void _array_concat(size_t size, dynarray_t *dest, dynarray_t *other, void * allo
 #include <assert.h>
 #include <stdio.h>
 
-static int _da_unit_test_part_condition(const int *item, void *ctx) {
-    DA_UNUSED(ctx);
-    return (*item % 2) == 0;
+static int _da_unit_test_part_condition(const int *item, const int *ctx) {
+    // DA_UNUSED(ctx);
+    return (*item < *ctx);
 }
 
 void _da_arr_unit_tests(void) {
@@ -614,16 +704,19 @@ void _da_arr_unit_tests(void) {
     for (int i = 0; i < 100; i++) {
         da_arr_push_value(int, array, i);
     }
-    // partition array with even numbers at the front and odd numbers at the back
-    size_t partition_index = da_arr_partition(int, array, _da_unit_test_part_condition);
-    // assert if partition is successfull the start of the odd numbers must be at index 50
-    assert(partition_index == 50);
-
     // assert correctness of values after mapping operation
     da_arr_map(int, array, item, {*item = (*item) * 2;});
     for (i = 0; i < 50; i++) {
-        assert(*da_arr_get(int, array, i) == i*2*2);
+        assert(*da_arr_get(int, array, i) == i*2);
     }
+    // partition array with even numbers at the front and odd numbers at the back
+    printf("before partition\n");
+    ptrdiff_t partition_index = da_arr_partition(int, array, _da_unit_test_part_condition);
+    printf("after partition\n");
+    // assert if partition is successfull the start of the odd numbers must be at index 50
+    assert(partition_index == (ptrdiff_t)da_arr_len(array)-1);
+
+    
 
     for (i = 50; i < 100; i++) {
         da_arr_insert_value(int, array, i, 101);    
