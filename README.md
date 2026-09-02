@@ -24,6 +24,7 @@ Functionality provided by dynarray.h:
 - insertion sort using rotate and upper_bound.
     upper_bound is created by passing a a_greater_than_b function as the condition to first_cond.
     thus a_greater_than_b must be provided to insertion sort.
+- quick-sort (non recursive)
 - Unit tests
 - realloc and free can be custom defined
 - print all elements with specified format.
