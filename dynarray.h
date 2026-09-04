@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.3.2 - Iain Dorsch - 2026
+    version 0.3.3 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -110,20 +110,20 @@ typedef struct {
     size_t end;
 } range_t;
 
-// #if defined(DA_ARR_CUSTOM_ALLOC)
+#if defined(DA_ARR_CUSTOM_ALLOC)
 typedef struct {
     size_t capacity;
     size_t cnt;
     void * allocator;
     char * data;
 } dynarray_t;
-// #else
-// typedef struct {
-//     size_t capacity;
-//     size_t cnt;
-//     char * data;
-// } dynarray_t;
-// #endif
+#else
+typedef struct {
+    size_t capacity;
+    size_t cnt;
+    char * data;
+} dynarray_t;
+#endif
 
 // // // // // // // // // // // // // // //
 extern void _da_arr_unit_tests(void);
@@ -317,6 +317,7 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
     da_slice_map(Type,slice,item,{printf(__VA_ARGS__);});\
     printf("\n");\
 }while(0)
+// // // // // // // // // // // // // // // 
 // // slice to array translation wrappers
 #define inner_arr_use_slice(array,slice_operation) do{slice_t *slice = &da_arr_to_slice(array); slice_operation;}while(0)
 #define da_arr_set_value(Type,array,index,elem) _slice_set(sizeof(Type),&da_arr_to_slice(array),index,(void *)&(Type){(elem)})
@@ -332,23 +333,31 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
 #define da_arr_insertion_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_insertion_sort(Type, slice, first, last, a, b, condition))
 #define da_arr_quick_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition))
 #define da_arr_print_all(Type, array, item, ...) inner_arr_use_slice(array,da_slice_print_all(Type, slice, item, __VA_ARGS__))
-// // internal operation allocation
-#define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_push_front(Type,array,elem) da_arr_insert(Type,array,0,elem,(array)->allocator)
-#define da_arr_insert_value(Type,array,index,elem) _array_insert(sizeof(Type),array,index,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_insert(Type,array,index,elem) _array_insert(sizeof(Type),array,index,elem, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_swap_remove(Type,array,index) _array_swap_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_remove(Type,array,index) _array_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_pop(Type,array) (Type *)_array_pop(sizeof(Type), array, DA_ARR_MIN_CAPACITY,(array)->allocator)
-#define da_arr_concat(Type,array_one,array_two) _array_concat(sizeof(Type),array_one,array_two,(array)->allocator)
-#define da_arr_free(array) _array_free(array,(array)->allocator)
-// // non internal operation allocation
-
+// // // // // // // // // // // // // // // 
+// // array utilities
 #define da_arr_len(array) (array)->cnt
 #define da_arr_capacity(array) (array)->capacity
 #define da_arr_is_empty(array) ((array)->cnt == 0)
 #define da_arr_clear(array) (array)->cnt = 0
+#define da_arr_peek(Type,array) da_arr_get(Type,array,(array)->cnt-1)
+#define da_arr_ptr(Type,array) ((Type*)((array)->data))
+// // // // // // // // // // // // // // // 
+// // internal operation allocation
+#ifdef DA_ARR_CUSTOM_ALLOC
+#define DA_ALLOCATOR(array) (array)->allocator
+#else
+#define DA_ALLOCATOR(array) NULL
+#endif
+#define da_arr_push_value(Type,array,elem) _array_push(sizeof(Type),array,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_push(Type,array,elem) _array_push(sizeof(Type),array,elem, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_push_front(Type,array,elem) da_arr_insert(Type,array,0,elem,DA_ALLOCATOR(array))
+#define da_arr_insert_value(Type,array,index,elem) _array_insert(sizeof(Type),array,index,(void *)&(Type){(elem)}, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_insert(Type,array,index,elem) _array_insert(sizeof(Type),array,index,elem, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_swap_remove(Type,array,index) _array_swap_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_remove(Type,array,index) _array_remove(sizeof(Type),array,index, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_pop(Type,array) (Type *)_array_pop(sizeof(Type), array, DA_ARR_MIN_CAPACITY,DA_ALLOCATOR(array))
+#define da_arr_concat(Type,array_one,array_two) _array_concat(sizeof(Type),array_one,array_two,DA_ALLOCATOR(array))
+#define da_arr_free(array) _array_free(array,DA_ALLOCATOR(array))
 
 #define da_arr_filter_remove_unstable(Type, array, item, condition) do{\
     size_t traverse = 0;\
@@ -361,9 +370,6 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
         }\
     }\
 }while(0)
-
-#define da_arr_peek(Type,array) da_arr_get(Type,array,(array)->cnt-1)
-#define da_arr_ptr(Type,array) ((Type*)((array)->data))
 // // // // // // // // // // // // // // // 
 // Internal functions implementations
 #ifdef DYNARRAY_IMPLEMENTATION
@@ -515,7 +521,9 @@ dynarray_t *_array_init(size_t size, size_t init_capacity, void * allocator) {
     dynarray_t *ptr = _array_empty(allocator);
     ptr->data = (char *)DA_REALLOC(allocator,NULL,size*init_capacity);
     // memset(ptr->data, 0, size*init_capacity);
+    #ifdef DA_ARR_CUSTOM_ALLOC
     ptr->allocator = allocator;
+    #endif
     ptr->capacity = init_capacity;
     return ptr;
 }
@@ -524,7 +532,9 @@ __attribute__((nonnull(3),warn_unused_result))
 dynarray_t * _array_init_with(size_t size, size_t count, void * elem, void * allocator) {
     dynarray_t *ptr = _array_empty(allocator);
     ptr->data = (char *)DA_REALLOC(allocator,NULL,size*count);
+    #ifdef DA_ARR_CUSTOM_ALLOC
     ptr->allocator = allocator;
+    #endif
     ptr->capacity = count;
     ptr->cnt = count;
     for (size_t i = 0; i < count; i++) {
