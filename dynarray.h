@@ -110,20 +110,15 @@ typedef struct {
     size_t end;
 } range_t;
 
-#if defined(DA_ARR_CUSTOM_ALLOC)
+
 typedef struct {
     size_t capacity;
     size_t cnt;
+    #ifdef DA_ARR_CUSTOM_ALLOC
     void * allocator;
+    #endif
     char * data;
 } dynarray_t;
-#else
-typedef struct {
-    size_t capacity;
-    size_t cnt;
-    char * data;
-} dynarray_t;
-#endif
 
 // // // // // // // // // // // // // // //
 extern void _da_arr_unit_tests(void);
