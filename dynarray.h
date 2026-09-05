@@ -281,6 +281,7 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
         RESULT = i;\
     }\
 }while(0)
+/**
 #define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
     range_t stack[(slice)->end];\
     ptrdiff_t stack_idx = 0;\
@@ -306,6 +307,34 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
             not_done = 0;\
         }\
     }\
+}while(0)
+*/
+#define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
+    range_t *stack = (range_t*)malloc(sizeof(range_t)*(slice)->end);\
+    ptrdiff_t stack_idx = 0;\
+    int not_done = 1;\
+    range_t current_range = (range_t){.start = first, .end = last};\
+    while(not_done) {\
+        if (current_range.start < current_range.end-1) {\
+            ptrdiff_t pi;\
+            inner_slice_partition_range(Type, slice, current_range.start, current_range.end, a, b, condition, pi);\
+            if (pi > (ptrdiff_t)current_range.start+1) {\
+                stack[stack_idx] = (range_t){.start = current_range.start, .end = pi};\
+                stack_idx += 1;\
+            }\
+            if (pi < (ptrdiff_t)current_range.end-1) {\
+                stack[stack_idx] = (range_t){.start = pi+1, .end = current_range.end};\
+                stack_idx += 1;\
+            }\
+        }\
+        if (stack_idx > 0) {\
+            stack_idx -= 1;\
+            current_range = stack[stack_idx];\
+        } else {\
+            not_done = 0;\
+        }\
+    }\
+    free(stack);\
 }while(0)
 #define da_slice_quick_sort(Type, slice, a, b, condition) inner_slice_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
 #define da_slice_print_all(Type,slice,item,...) do{\
