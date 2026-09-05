@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.3.3 - Iain Dorsch - 2026
+    version 0.3.4 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -109,7 +109,6 @@ typedef struct {
     size_t start;
     size_t end;
 } range_t;
-
 
 typedef struct {
     size_t capacity;
@@ -241,7 +240,6 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
 #define inner_slice_match_first(Type, slice, first, last, item, condition, RESULT) do{\
     RESULT = -1;\
     for(size_t __i = first; __i<(size_t)last; __i++) {\
-        /**Type* item = (Type *)((slice)->start + __i * sizeof(Type));*/\
         Type* item = da_slice_get(Type,slice,__i);\
         if(condition) {\
             RESULT = __i;\
@@ -284,28 +282,30 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
     }\
 }while(0)
 #define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
-    dynarray_t * stack = _array_init(sizeof(range_t), DA_ARR_MIN_CAPACITY, NULL);\
-    ptrdiff_t pi;\
-    int done = 1;\
-    range_t *c_range = &((range_t){.start = first, .end = last});\
-    while (done) {\
-        if (c_range->start < c_range->end-1) {\
-            inner_slice_partition_range(Type,(slice),c_range->start,c_range->end,a,b,condition,pi);\
-            if (pi > (ptrdiff_t)c_range->start) {\
-                _array_push(sizeof(range_t), stack, &((range_t){.start=c_range->start, .end=pi}), DA_ARR_MIN_CAPACITY, NULL);\
+    range_t stack[(slice)->end];\
+    ptrdiff_t stack_idx = 0;\
+    int not_done = 1;\
+    range_t current_range = (range_t){.start = first, .end = last};\
+    while(not_done) {\
+        if (current_range.start < current_range.end-1) {\
+            ptrdiff_t pi;\
+            inner_slice_partition_range(Type, slice, current_range.start, current_range.end, a, b, condition, pi);\
+            if (pi > (ptrdiff_t)current_range.start+1) {\
+                stack[stack_idx] = (range_t){.start = current_range.start, .end = pi};\
+                stack_idx += 1;\
             }\
-            if (pi < (ptrdiff_t)c_range->end-1) {\
-                _array_push(sizeof(range_t), stack, &((range_t){.start=pi + 1, .end=c_range->end}), DA_ARR_MIN_CAPACITY, NULL);\
+            if (pi < (ptrdiff_t)current_range.end-1) {\
+                stack[stack_idx] = (range_t){.start = pi+1, .end = current_range.end};\
+                stack_idx += 1;\
             }\
         }\
-        if (stack->cnt > 0) {\
-            c_range = (range_t *)_array_pop(sizeof(range_t), stack, DA_ARR_MIN_CAPACITY, NULL);\
+        if (stack_idx > 0) {\
+            stack_idx -= 1;\
+            current_range = stack[stack_idx];\
         } else {\
-            done = 0;\
+            not_done = 0;\
         }\
     }\
-    _array_free(stack,NULL);\
-    inner_slice_insertion_sort(Type,slice,first,last,a,b,(*a>*b)); \
 }while(0)
 #define da_slice_quick_sort(Type, slice, a, b, condition) inner_slice_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
 #define da_slice_print_all(Type,slice,item,...) do{\
@@ -444,63 +444,6 @@ void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, s
     }
     _slice_rotate_swap(size, slice, write, next_read, last);
 }
-
-__attribute__((hot,warn_unused_result,nonnull(2,5)))
-ptrdiff_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
-    if (end <= 0) {
-        return -1;
-    }
-    size_t inner_end = end - 1;
-    if (inner_end <= start) return -1;
-    // size_t pivot_idx = inner_end;
-    char * elem_pivot = _slice_get(size,slice,inner_end);
-    ptrdiff_t i = start;
-    for (size_t j = start; j < inner_end; j++) {
-        char * elem_j = _slice_get(size,slice,j);
-        if (f(elem_j,elem_pivot)) {
-            _slice_swap_index(size,slice,i,j);
-            i++;
-        }
-    }
-    _slice_swap_index(size,slice,i,inner_end);
-    return i;
-}
-
-void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
-    if (start < end-1) {
-        ptrdiff_t pi = _slice_partition_range(size,slice,start,end,f);
-        if (pi > start) {
-            _slice_quick_sort(size, slice, start, pi, f);
-        }
-        if (pi < end-1) {
-            _slice_quick_sort(size, slice, pi + 1, end, f);
-        }
-    }
-}
-
-// void _slice_non_recursive_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *)) {
-//     dynarray_t * stack = _array_init(sizeof(range_t), DA_ARR_MIN_CAPACITY, NULL);
-//     ptrdiff_t pi;
-//     int done = 1;
-//     range_t *c_range = &(range_t){.start = start, .end = end};
-//     while (done) {
-//         if (c_range->start < c_range->end-1) {
-//             pi = _slice_partition_range(size,slice,c_range->start,c_range->end,f);
-//             if (pi > c_range->start) {
-//                 _array_push(sizeof(range_t), stack, &(range_t){.start=c_range->start, .end=pi}, DA_ARR_MIN_CAPACITY, NULL);
-//             }
-//             if (pi < c_range->end-1) {
-//                 _array_push(sizeof(range_t), stack, &(range_t){.start=pi + 1, .end=c_range->end}, DA_ARR_MIN_CAPACITY, NULL);
-//             }
-//         }
-//         if (stack->cnt > 0) {
-//             c_range = _array_pop(sizeof(range_t), stack, DA_ARR_MIN_CAPACITY, NULL);
-//         } else {
-//             done = 0;
-//         }
-//     }
-//     _array_free(stack,NULL);
-// }
 // // // // // // // // // // // // // // // 
 // array functions: requires capacity and/or allocation
 __attribute__((warn_unused_result))
