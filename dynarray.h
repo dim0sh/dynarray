@@ -1,5 +1,5 @@
 /*  dynarray.h - typesafe dynamic array library 
-    version 0.3.4 - Iain Dorsch - 2026
+    version 0.3.5 - Iain Dorsch - 2026
 
     To use this library, do the following in *one* of your .c files:
         #define DYNARRAY_IMPLEMENTATION
@@ -156,6 +156,8 @@ extern void _da_arr_unit_tests(void);
 #define arr_ptr                     da_arr_ptr
 #define arr_match_first             da_arr_match_first
 #define arr_insertion_sort          da_arr_insertion_sort
+#define arr_quick_sort              da_arr_quick_sort
+#define arr_stack_quick_sort        da_arr_stack_quick_sort
 // slice macros
 #define slice_init                  da_slice_init
 #define slice_from_arr              da_slice_from_arr
@@ -171,6 +173,8 @@ extern void _da_arr_unit_tests(void);
 #define slice_match_first           da_slice_match_first
 #define slice_insertion_sort        da_slice_insertion_sort
 #define slice_partition             da_slice_partition
+#define slice_quick_sort            da_slice_quick_sort
+#define slice_stack_quick_sort      da_slice_stack_quick_sort
 
 #endif
 // // // // // // // // // // // // // // // 
@@ -192,6 +196,7 @@ extern void _slice_swap_index(size_t size, slice_t *slice, size_t idx_one, size_
 extern void _slice_rotate_swap(size_t size, slice_t *slice, size_t first, size_t mid, size_t last);
 extern ptrdiff_t _slice_partition_range(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *));
 extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t end, int (*f)(const char *, const char *));
+extern size_t da_log_two(size_t);
 
 // // // // // // // // // // // // // // // 
 // No short names API
@@ -281,9 +286,9 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
         RESULT = i;\
     }\
 }while(0)
-/**
-#define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
-    range_t stack[(slice)->end];\
+
+#define inner_slice_stack_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
+    range_t stack[da_log_two((slice)->end)];\
     ptrdiff_t stack_idx = 0;\
     int not_done = 1;\
     range_t current_range = (range_t){.start = first, .end = last};\
@@ -308,9 +313,9 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
         }\
     }\
 }while(0)
-*/
-#define inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
-    range_t *stack = (range_t*)malloc(sizeof(range_t)*(slice)->end);\
+
+#define inner_slice_alloc_non_recursive_quick_sort(Type, slice, first, last, a, b, condition) do{\
+    range_t *stack = (range_t*)malloc(sizeof(range_t)*da_log_two((slice)->end));\
     ptrdiff_t stack_idx = 0;\
     int not_done = 1;\
     range_t current_range = (range_t){.start = first, .end = last};\
@@ -336,7 +341,9 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
     }\
     free(stack);\
 }while(0)
-#define da_slice_quick_sort(Type, slice, a, b, condition) inner_slice_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
+
+#define da_slice_quick_sort(Type, slice, a, b, condition) inner_slice_alloc_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
+#define da_slice_stack_quick_sort(Type, slice, a, b, condition) inner_slice_stack_non_recursive_quick_sort(Type, slice, 0, (slice)->end, a, b, condition)
 #define da_slice_print_all(Type,slice,item,...) do{\
     da_slice_map(Type,slice,item,{printf(__VA_ARGS__);});\
     printf("\n");\
@@ -355,7 +362,8 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
 #define da_arr_filter_each(Type, array, item, condition, operation) inner_arr_use_slice(array,da_slice_filter_each(Type, slice, item, condition, operation))
 #define da_arr_match_first(Type, array, first, last, item, condition, RESULT) inner_arr_use_slice(array,inner_slice_match_first(Type, slice, first, last, item, condition, RESULT))
 #define da_arr_insertion_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_insertion_sort(Type, slice, first, last, a, b, condition))
-#define da_arr_quick_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_non_recursive_quick_sort(Type, slice, first, last, a, b, condition))
+#define da_arr_quick_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_alloc_non_recursive_quick_sort(Type, slice, first, last, a, b, condition))
+#define da_arr_stack_quick_sort(Type, array, first, last, a, b, condition) inner_arr_use_slice(array,inner_slice_stack_non_recursive_quick_sort(Type, slice, first, last, a, b, condition))
 #define da_arr_print_all(Type, array, item, ...) inner_arr_use_slice(array,da_slice_print_all(Type, slice, item, __VA_ARGS__))
 // // // // // // // // // // // // // // // 
 // // array utilities
@@ -401,6 +409,12 @@ extern void _slice_quick_sort(size_t size, slice_t *slice, size_t start, size_t 
 #include <string.h>
 #include <stdlib.h>
 #include <stddef.h>
+
+size_t da_log_two(size_t x) {
+    size_t log_two = 0;
+    while (x >>= 1) ++log_two;
+    return log_two;
+}
 // // // // // // // // // // // // // // // 
 // slice functions and array wrappers for them
 // slice functionality :
